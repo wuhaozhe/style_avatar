@@ -1,4 +1,4 @@
-**/__pycache__/
+__pycache__/
 **/*.pyc
 deepspeech/deepspeech-0.9.2-checkpoint/
 **/*.wav
