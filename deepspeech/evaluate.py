@@ -339,7 +339,7 @@ def create_session():
 
 
 def do_inference(audio_path):
-    features, features_len = audiofile_to_features(input_file_path)
+    features, features_len = audiofile_to_features(audio_path)
     previous_state_c = np.zeros([1, Config.n_cell_dim])
     previous_state_h = np.zeros([1, Config.n_cell_dim])
 
