@@ -55,7 +55,7 @@ def initialize_globals():
 
     # Set default checkpoint dir
     if not FLAGS.checkpoint_dir:
-        FLAGS.checkpoint_dir = os.path.join('deepspeech', 'deepspeech-0.9.2-checkpoint')
+        FLAGS.checkpoint_dir = os.path.join(os.path.dirname(__file__), '../', 'deepspeech-0.9.2-checkpoint')
 
 
     if FLAGS.load_train not in ['last', 'best', 'init', 'auto']:
@@ -87,7 +87,7 @@ def initialize_globals():
     if FLAGS.bytes_output_mode:
         c.alphabet = UTF8Alphabet()
     else:
-        c.alphabet = Alphabet(os.path.abspath(FLAGS.alphabet_config_path))
+        c.alphabet = Alphabet(os.path.join(os.path.dirname(__file__), '../', 'data/alphabet.txt'))
 
     # Geometric Constants
     # ===================
