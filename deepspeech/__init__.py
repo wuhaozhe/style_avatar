@@ -1,3 +1,3 @@
-from .evaluate import do_inference, run_script
+from .evaluate import get_prob, run_script
 
 run_script()

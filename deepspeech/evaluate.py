@@ -338,7 +338,8 @@ def create_session():
     DeepSpeechGlobalSession.outputs = outputs
 
 
-def do_inference(audio_path):
+def get_prob(audio_path):
+    # return (L * 29)
     features, features_len = audiofile_to_features(audio_path)
     previous_state_c = np.zeros([1, Config.n_cell_dim])
     previous_state_h = np.zeros([1, Config.n_cell_dim])
