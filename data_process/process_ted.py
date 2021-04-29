@@ -4,6 +4,7 @@ import lmdb
 import multiprocessing
 import time
 import imageio
+import face_alignment
 import pickle as pkl
 from moviepy.editor import VideoFileClip
 from tqdm import tqdm
@@ -75,7 +76,7 @@ def detect_worker(wid, folder_list, src_video_path):
                 pkl.dump(lm_list, open(file_path[:-4] + "_lm.pkl", 'wb'))
 
     
-def detect(wnum = 8):
+def detect(wnum = 1):
     '''
         detect face landmarks
         param:
@@ -98,7 +99,7 @@ def detect(wnum = 8):
         p_array.append(p)
         p.start()
         # force sleep 3 seconds of eahc thread to prevent conflicts when face_alignment model occupies GPU
-        time.sleep(3)
+        # time.sleep(3)
 
     for i in range(wnum):
         p_array[i].join()
@@ -134,7 +135,7 @@ def get_features(wnum = 8):
 
 def main():
     # coarse_slice()
-    detect()
+    detect(4)
     # fine_slice()
 
 if __name__ == "__main__":
