@@ -6,8 +6,12 @@ import time
 import imageio
 import face_alignment
 import pickle as pkl
+import numpy as np
+import cv2
+import soundfile as sf
 from moviepy.editor import VideoFileClip
 from tqdm import tqdm
+from utils import lm68_2_lm5_batch, mean_eye_distance
 
 '''
     the process of ted hd dataset contains the following stages:
@@ -98,18 +102,127 @@ def detect(wnum = 1):
         p = multiprocessing.Process(target = detect_worker, args = (wid, sub_folder_list, src_video_path))
         p_array.append(p)
         p.start()
-        # force sleep 3 seconds of eahc thread to prevent conflicts when face_alignment model occupies GPU
-        # time.sleep(3)
 
     for i in range(wnum):
         p_array[i].join()
+
+
+def split_lm(lm_list):
+    '''
+        Scenario split:
+        split landmark5 according to the landmark distance, 
+        if distance is too large, conduct split
+    '''
+    lm_list = np.array(lm_list).reshape(-1, 10)
+    lm_diff = lm_list[1:] - lm_list[:-1]
+    diff_norm = np.linalg.norm(lm_diff, ord = 2, axis = 1)
+    diff_mask = diff_norm > 100
+    split_index = np.nonzero(diff_mask)[0]
+    return split_index
+
+
+def save_fine_clip(src_video_path, dst_video_path, folder, file_name, lm_list, sep_list, file_cnt):
+    dst_path = os.path.join(dst_video_path, folder)
+    src_path = "{}/{}/{}.mp4".format(src_video_path, folder, file_name)
+    os.system("rm ../data/tmp/test.wav")
+    os.system("ffmpeg -loglevel warning -i {} -ar 16000 ../data/tmp/test.wav".format(src_path))
+    cap = cv2.VideoCapture(src_path)
+    frame_list = []
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if ret == False:
+            break
+        frame_list.append(frame)
+    cap.release()
+
+    audio, sr = sf.read("../data/tmp/test.wav")
+    
+    if not os.path.exists(dst_path):
+        os.makedirs(dst_path)
+
+    for sep in sep_list:
+        frame_sep = frame_list[sep[0]: sep[1]]
+        lm_sep = lm_list[sep[0]: sep[1]]
+        audio_sep = audio[int(sep[0] * sr / 25): min(int(sep[1] * sr / 25), audio.shape[0])]
+
+        # save
+        sf.write(os.path.join(dst_path, "{}.wav".format(file_cnt[0])), audio_sep, sr)
+        pkl.dump(lm_sep, open(os.path.join(dst_path, "{}.pkl".format(file_cnt[0])), 'wb'))
+        
+        for idx, frame in enumerate(frame_sep):
+            cv2.imwrite("../data/tmp/{}.jpg".format(idx), frame)
+
+        os.system("ffmpeg -loglevel warning -framerate 25 -start_number 0 -i ../data/tmp/%d.jpg -c:v libx264 -b:v 2000k {}".format(os.path.join(dst_path, "{}.mp4".format(file_cnt[0]))))
+        os.system("rm ../data/tmp/*.jpg")
+        file_cnt[0] += 1
 
 def fine_slice():
     '''
         cut slices to more fine-grained piece according to scene change and face size
         save results to folders
     '''
-    pass
+    src_video_path = "../data/ted_hd/slice_video_coarse"
+    dst_video_path = "../data/ted_hd/slice_video_fine"
+    if not os.path.exists(dst_video_path):
+        os.makedirs(dst_video_path)
+
+    src_folder_list = os.listdir(src_video_path)
+    src_folder_list.sort()
+
+    for folder in tqdm(src_folder_list):
+        folder_path = os.path.join(src_video_path, folder)
+        file_list = os.listdir(folder_path)
+
+        file_num = 0
+        for file_name in file_list:
+            if file_name.endswith("mp4"):
+                file_num += 1
+        
+        file_cnt = [0]
+        for i in range(file_num):
+            lm_list = pkl.load(open(os.path.join(folder_path, "{}_lm.pkl".format(i)), 'rb'))
+            lm5_list = lm68_2_lm5_batch(lm_list)
+            split_index = split_lm(lm5_list)
+
+            start_idx = 1
+            if len(split_index) == 0:
+                end_idx = len(lm5_list) - 1
+            else:
+                end_idx = split_index[0]
+
+            sep_list = []
+            for j in range(len(split_index) + 1):
+                if end_idx - start_idx < 70:
+                    continue
+                else:
+                    # drop if face is too small
+                    eye_distance = mean_eye_distance(lm5_list[start_idx: end_idx])
+                    if eye_distance < 35:
+                        continue
+                    else:
+                        sep_list.append([start_idx, end_idx])
+                    # save mp3, mp4 and landmark
+                
+                # update index
+                if j < len(split_index) - 1:
+                    start_idx = split_index[j] + 2
+                    end_idx = split_index[j + 1]
+                elif j == len(split_index) - 1:
+                    start_idx = split_index[j] + 2
+                    end_idx = len(lm5_list) - 1
+                else:
+                    break
+
+            save_fine_clip(src_video_path, dst_video_path, folder, i, lm5_list, sep_list, file_cnt)
+
+
+def split_train_test():
+    '''
+        gather dataset and split to training and testing
+        no overlap on identity between training and testing set
+    '''
+    
+
 
 def get_features_worker(wid):
     lmdb_path = "../data/ted_hd/lmdb"
@@ -135,8 +248,9 @@ def get_features(wnum = 8):
 
 def main():
     # coarse_slice()
-    detect(4)
+    # detect(4)
     # fine_slice()
+    split_train_test()
 
 if __name__ == "__main__":
     main()
