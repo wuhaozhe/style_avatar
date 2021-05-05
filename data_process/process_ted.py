@@ -220,16 +220,64 @@ def split_train_test():
     '''
         gather dataset and split to training and testing
         no overlap on identity between training and testing set
+        build lmdb
     '''
-    
+    src_path = "../data/ted_hd/slice_video_fine"
+    folder_list = os.listdir(src_path)
+    folder_list.sort()
+    split_folder = 68
 
-
-def get_features_worker(wid):
+    # if folder number is smaller than split folder, group to train set
+    # if folder number is no smaller than split folder, group to test set
     lmdb_path = "../data/ted_hd/lmdb"
     if not os.path.exists(lmdb_path):
         os.makedirs(lmdb_path)
+    
+    env = lmdb.open(lmdb_path, map_size=1099511627776, max_dbs = 64)
 
-    env = lmdb.open(lmdb_path, map_size=1099511627776)
+    train_video = env.open_db("train_video".encode())
+    train_audio = env.open_db("train_audio".encode())
+    train_lm5 = env.open_db("train_lm5".encode())
+    test_video = env.open_db("test_video".encode())
+    test_audio = env.open_db("test_audio".encode())
+    test_lm5 = env.open_db("test_lm5".encode())
+
+    with env.begin(write = True) as txn:
+        train_cnt, test_cnt = 0, 0
+        for folder_name in tqdm(folder_list):
+            folder_path = os.path.join(src_path, folder_name)
+            file_list = os.listdir(folder_path)
+            file_list.sort()
+            file_num = 0
+            for file_name in file_list:
+                if file_name.endswith("mp4"):
+                    file_num += 1
+
+            for idx in range(file_num):
+                video_path = os.path.join(folder_path, "{}.mp4".format(idx))
+                lm_path = os.path.join(folder_path, "{}.pkl".format(idx))
+                audio_path = os.path.join(folder_path, "{}.wav".format(idx))
+                with open(video_path, 'rb') as f:
+                    video_bin = f.read()
+                with open(lm_path, 'rb') as f:
+                    lm_bin = f.read()
+                with open(audio_path, 'rb') as f:
+                    audio_bin = f.read()
+
+                if int(folder_name) < split_folder:
+                    txn.put(str(train_cnt).encode(), video_bin, db = train_video)
+                    txn.put(str(train_cnt).encode(), lm_bin, db = train_lm5)
+                    txn.put(str(train_cnt).encode(), audio_bin, db = train_audio)
+                    train_cnt += 1
+                else:
+                    txn.put(str(test_cnt).encode(), video_bin, db = test_video)
+                    txn.put(str(test_cnt).encode(), lm_bin, db = test_lm5)
+                    txn.put(str(test_cnt).encode(), audio_bin, db = test_audio)
+                    test_cnt += 1
+
+
+def get_features_worker(wid):
+    pass
 
 def get_features(wnum = 8):
     '''
@@ -252,5 +300,29 @@ def main():
     # fine_slice()
     split_train_test()
 
+def test():
+    lmdb_path = "../data/ted_hd/lmdb"
+    env = lmdb.open(lmdb_path, map_size=1099511627776, max_dbs = 64)
+
+    train_video = env.open_db("train_video".encode())
+    train_audio = env.open_db("train_audio".encode())
+    train_lm5 = env.open_db("train_lm5".encode())
+    test_video = env.open_db("test_video".encode())
+    test_audio = env.open_db("test_audio".encode())
+    test_lm5 = env.open_db("test_lm5".encode())
+
+    with env.begin(write = False) as txn:
+        video = txn.get(str(0).encode(), db=test_video)
+        audio = txn.get(str(0).encode(), db=test_audio)
+        # video_file = open("test.mp4", "wb")
+        # audio_file = open("test.wav", "wb")
+        # video_file.write(video)
+        # audio_file.write(audio)
+        # video_file.close()
+        # audio_file.close()
+        print(txn.stat(db=train_video))
+        print(txn.stat(db=test_video))
+
 if __name__ == "__main__":
     main()
+    # test()
