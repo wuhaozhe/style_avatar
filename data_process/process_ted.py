@@ -298,7 +298,8 @@ def main():
     # coarse_slice()
     # detect(4)
     # fine_slice()
-    split_train_test()
+    # split_train_test()
+    get_features()
 
 def test():
     lmdb_path = "../data/ted_hd/lmdb"
@@ -314,12 +315,12 @@ def test():
     with env.begin(write = False) as txn:
         video = txn.get(str(0).encode(), db=test_video)
         audio = txn.get(str(0).encode(), db=test_audio)
-        # video_file = open("test.mp4", "wb")
-        # audio_file = open("test.wav", "wb")
-        # video_file.write(video)
-        # audio_file.write(audio)
-        # video_file.close()
-        # audio_file.close()
+        video_file = open("test.mp4", "wb")
+        audio_file = open("test.wav", "wb")
+        video_file.write(video)
+        audio_file.write(audio)
+        video_file.close()
+        audio_file.close()
         print(txn.stat(db=train_video))
         print(txn.stat(db=test_video))
 
