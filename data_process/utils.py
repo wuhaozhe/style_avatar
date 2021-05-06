@@ -4,6 +4,7 @@
 # import librosa
 # from deepspeech import get_prob
 import numpy as np
+import cv2
 
 def lm68_2_lm5(in_lm):
     lm_idx = np.array([31,37,40,43,46,49,55]) - 1
@@ -26,3 +27,13 @@ def mean_eye_distance(lm_list):
     right_eye = lm_list[:, 1, :].reshape(-1, 2)
     eye_dis = np.linalg.norm(left_eye - right_eye, ord=2, axis = 1)
     return np.mean(eye_dis)
+
+def read_video(video_path):
+    cap = cv2.VideoCapture(video_path)
+    frame_list = []
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if ret == False:
+            break
+        frame_list.append(frame)
+    return np.array(frame_list)

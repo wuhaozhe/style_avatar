@@ -4,6 +4,9 @@ deepspeech/deepspeech-0.9.2-checkpoint/
 **/*.wav
 **/*.zip
 **/*.m4a
+**/*.mp4
 data/
 deep_3drecon/BFM/
 deep_3drecon/network/
+deep_3drecon/test/
+data_process/test/

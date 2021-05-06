@@ -1,7 +1,8 @@
 import tensorflow as tf 
 import math as m
 import numpy as np
-import mesh_renderer.mesh_renderer as mesh_renderer
+import os
+from .mesh_renderer import mesh_renderer
 from scipy.io import loadmat
 ###############################################################################################
 # Reconstruct 3D face based on output coefficients and facemodel
@@ -13,10 +14,6 @@ class BFM():
 		model = loadmat(model_path)
 		self.meanshape = tf.constant(model['meanshape']) # mean face shape. [3*N,1]
 		self.idBase = tf.constant(model['idBase']) # identity basis. [3*N,80]
-		# model['exBase'] = model['exBase'].reshape(-1, 3, 64)
-		# model['exBase'][:, 0, :] = 0
-		# model['exBase'][:, 1, :] = 0
-		# model['exBase'] = model['exBase'].reshape(-1, 64)
 		self.exBase = tf.constant(model['exBase'].astype(np.float32)) # expression basis. [3*N,64]
 		self.meantex = tf.constant(model['meantex']) # mean face texture. [3*N,1] (0-255)
 		self.texBase = tf.constant(model['texBase']) # texture basis. [3*N,80]
@@ -26,14 +23,15 @@ class BFM():
 
 # Analytic 3D face reconstructor
 class Face3D():
-	def __init__(self):
-		facemodel = BFM()
+	def __init__(self, bfm_path):
+		facemodel = BFM(os.path.join(bfm_path, 'BFM_model_front.mat'))
 		self.facemodel = facemodel
+		self.bfm_path = bfm_path
 
 	# analytic 3D face reconstructions with coefficients from R-Net
 	def Reconstruction_Block(self, coeff, batchsize, in_texture = None):
 
-		self.uv = tf.constant(np.tile(np.expand_dims(np.load("./BFM/uv.npy").astype(np.float32), 0), (batchsize, 1, 1))) * 255 # uv of each index [N, 3]
+		self.uv = tf.constant(np.tile(np.expand_dims(np.load(os.path.join(self.bfm_path, 'uv.npy')).astype(np.float32), 0), (batchsize, 1, 1))) * 255 # uv of each index [N, 3]
 		#coeff: [batchsize,257] reconstruction coefficients
 		id_coeff,ex_coeff,tex_coeff,angles,translation,gamma = self.Split_coeff(coeff)
 		# [batchsize,N,3] canonical face shape in BFM space
@@ -59,12 +57,10 @@ class Face3D():
 		face_landmark_t = self.Compute_landmark(face_shape_t,self.facemodel)
 		landmark_p = self.Projection_block(face_landmark_t)   # 256*256 image
 		landmark_p = tf.stack([landmark_p[:,:,0],223. - landmark_p[:,:,1]],axis = 2)
-		# landmark_3d = tf.stack([landmark_p[:,:,0],223. - landmark_p[:,:,1], landmark_p[:, :, 2]],axis = 2)
 		self.landmark_p = landmark_p
 
 		landmark_3d = self.Projection_block3d(face_landmark_t)
 		self.landmark_3d = landmark_3d
-		# self.landmark_3d = landmark_3d
 
 		# [batchsize,N,3] vertex color (in RGB order)
 		face_color = self.Illumination_block(face_texture, norm_r, gamma)
@@ -241,11 +237,6 @@ class Face3D():
 		# aug_projection = tf.matmul(face_shape,tf.transpose(p_matrix,[0,2,1]))
 
 		return face_shape
-		# # [batchsize, N,2] 2d face projection
-		# face_projection = aug_projection[:,:,0:2]/tf.reshape(aug_projection[:,:,2],[tf.shape(face_shape)[0],tf.shape(aug_projection)[1],1])
-
-
-		# return face_projection
 
 
 	def Compute_landmark(self,face_shape,facemodel):
