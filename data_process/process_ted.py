@@ -1,4 +1,6 @@
 
+import sys
+sys.path.append("..")
 import os
 import lmdb
 import multiprocessing
@@ -9,9 +11,11 @@ import pickle as pkl
 import numpy as np
 import cv2
 import soundfile as sf
+import deep_3drecon
 from moviepy.editor import VideoFileClip
 from tqdm import tqdm
-from utils import lm68_2_lm5_batch, mean_eye_distance
+from utils import lm68_2_lm5_batch, mean_eye_distance, read_video
+from io import BytesIO
 
 '''
     the process of ted hd dataset contains the following stages:
@@ -160,6 +164,7 @@ def fine_slice():
     '''
         cut slices to more fine-grained piece according to scene change and face size
         save results to folders
+        TODO: save landmark 68
     '''
     src_video_path = "../data/ted_hd/slice_video_coarse"
     dst_video_path = "../data/ted_hd/slice_video_fine"
@@ -288,6 +293,8 @@ def get_features(wnum = 8):
             mean and std for calculating style code
             rgb texture
             uv map
+            mouth region mask
+            lm 68
         For audio:
             deepspeech feature
             energy feature
@@ -314,16 +321,26 @@ def test():
 
     with env.begin(write = False) as txn:
         video = txn.get(str(0).encode(), db=test_video)
-        audio = txn.get(str(0).encode(), db=test_audio)
-        video_file = open("test.mp4", "wb")
-        audio_file = open("test.wav", "wb")
-        video_file.write(video)
-        audio_file.write(audio)
-        video_file.close()
-        audio_file.close()
-        print(txn.stat(db=train_video))
-        print(txn.stat(db=test_video))
+        lm = txn.get(str(0).encode(), db=test_lm5)
+        # audio = txn.get(str(0).encode(), db=test_audio)
+        # video_file = open("test.mp4", "wb")
+        # audio_file = open("test.wav", "wb")
+        # video_file.write(video)
+        # audio_file.write(audio)
+        # video_file.close()
+        # audio_file.close()
+        # print(txn.stat(db=train_video))
+        # print(txn.stat(db=test_video))
+    
+    lm = pkl.load(BytesIO(lm))
+    video_file = open("test.mp4", "wb")
+    video_file.write(video)
+    video_file.close()
+    frames = read_video("test.mp4")
+    coeff = deep_3drecon.recon_coeff(frames, lm)
+    deep_3drecon.recon_uv_from_coeff(coeff, "test3.mp4")
+    
 
 if __name__ == "__main__":
-    main()
-    # test()
+    # main()
+    test()
