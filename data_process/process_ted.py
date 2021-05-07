@@ -125,7 +125,7 @@ def split_lm(lm_list):
     return split_index
 
 
-def save_fine_clip(src_video_path, dst_video_path, folder, file_name, lm_list, sep_list, file_cnt):
+def save_fine_clip(src_video_path, dst_video_path, folder, file_name, lm5_list, lm68_list, sep_list, file_cnt):
     dst_path = os.path.join(dst_video_path, folder)
     src_path = "{}/{}/{}.mp4".format(src_video_path, folder, file_name)
     os.system("rm ../data/tmp/test.wav")
@@ -146,12 +146,14 @@ def save_fine_clip(src_video_path, dst_video_path, folder, file_name, lm_list, s
 
     for sep in sep_list:
         frame_sep = frame_list[sep[0]: sep[1]]
-        lm_sep = lm_list[sep[0]: sep[1]]
+        lm5_sep = lm5_list[sep[0]: sep[1]]
+        lm68_sep = lm68_list[sep[0]: sep[1]]
         audio_sep = audio[int(sep[0] * sr / 25): min(int(sep[1] * sr / 25), audio.shape[0])]
 
         # save
         sf.write(os.path.join(dst_path, "{}.wav".format(file_cnt[0])), audio_sep, sr)
-        pkl.dump(lm_sep, open(os.path.join(dst_path, "{}.pkl".format(file_cnt[0])), 'wb'))
+        pkl.dump(lm5_sep, open(os.path.join(dst_path, "{}_5.pkl".format(file_cnt[0])), 'wb'))
+        pkl.dump(lm68_sep, open(os.path.join(dst_path, "{}_68.pkl".format(file_cnt[0])), 'wb'))
         
         for idx, frame in enumerate(frame_sep):
             cv2.imwrite("../data/tmp/{}.jpg".format(idx), frame)
@@ -218,7 +220,7 @@ def fine_slice():
                 else:
                     break
 
-            save_fine_clip(src_video_path, dst_video_path, folder, i, lm5_list, sep_list, file_cnt)
+            save_fine_clip(src_video_path, dst_video_path, folder, i, lm5_list, lm_list, sep_list, file_cnt)
 
 
 def split_train_test():
@@ -243,9 +245,11 @@ def split_train_test():
     train_video = env.open_db("train_video".encode())
     train_audio = env.open_db("train_audio".encode())
     train_lm5 = env.open_db("train_lm5".encode())
+    train_lm68 = env.open_db("train_lm68".encode())
     test_video = env.open_db("test_video".encode())
     test_audio = env.open_db("test_audio".encode())
     test_lm5 = env.open_db("test_lm5".encode())
+    test_lm68 = env.open_db("test_lm68".encode())
 
     with env.begin(write = True) as txn:
         train_cnt, test_cnt = 0, 0
@@ -260,23 +264,28 @@ def split_train_test():
 
             for idx in range(file_num):
                 video_path = os.path.join(folder_path, "{}.mp4".format(idx))
-                lm_path = os.path.join(folder_path, "{}.pkl".format(idx))
+                lm5_path = os.path.join(folder_path, "{}_5.pkl".format(idx))
+                lm68_path = os.path.join(folder_path, "{}_68.pkl".format(idx))
                 audio_path = os.path.join(folder_path, "{}.wav".format(idx))
                 with open(video_path, 'rb') as f:
                     video_bin = f.read()
-                with open(lm_path, 'rb') as f:
-                    lm_bin = f.read()
+                with open(lm5_path, 'rb') as f:
+                    lm5_bin = f.read()
+                with open(lm68_path, 'rb') as f:
+                    lm68_bin = f.read()
                 with open(audio_path, 'rb') as f:
                     audio_bin = f.read()
 
                 if int(folder_name) < split_folder:
                     txn.put(str(train_cnt).encode(), video_bin, db = train_video)
-                    txn.put(str(train_cnt).encode(), lm_bin, db = train_lm5)
+                    txn.put(str(train_cnt).encode(), lm5_bin, db = train_lm5)
+                    txn.put(str(train_cnt).encode(), lm68_bin, db = train_lm68)
                     txn.put(str(train_cnt).encode(), audio_bin, db = train_audio)
                     train_cnt += 1
                 else:
                     txn.put(str(test_cnt).encode(), video_bin, db = test_video)
-                    txn.put(str(test_cnt).encode(), lm_bin, db = test_lm5)
+                    txn.put(str(test_cnt).encode(), lm5_bin, db = test_lm5)
+                    txn.put(str(test_cnt).encode(), lm68_bin, db = test_lm68)
                     txn.put(str(test_cnt).encode(), audio_bin, db = test_audio)
                     test_cnt += 1
 
@@ -304,9 +313,9 @@ def get_features(wnum = 8):
 def main():
     # coarse_slice()
     # detect(4)
-    # fine_slice()
-    # split_train_test()
-    get_features()
+    fine_slice()
+    split_train_test()
+    # get_features()
 
 def test():
     lmdb_path = "../data/ted_hd/lmdb"
@@ -346,5 +355,5 @@ def test():
     
 
 if __name__ == "__main__":
-    # main()
-    test()
+    main()
+    # test()
