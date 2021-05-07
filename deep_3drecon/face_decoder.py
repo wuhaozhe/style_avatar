@@ -3,10 +3,12 @@ import math as m
 import numpy as np
 import os
 from .mesh_renderer import mesh_renderer
+from .interpolate import interpolate_bilinear
 from scipy.io import loadmat
 ###############################################################################################
 # Reconstruct 3D face based on output coefficients and facemodel
 ###############################################################################################
+
 
 # BFM 3D face model
 class BFM():
@@ -29,7 +31,7 @@ class Face3D():
 		self.bfm_path = bfm_path
 
 	# analytic 3D face reconstructions with coefficients from R-Net
-	def Reconstruction_Block(self, coeff, batchsize, in_texture = None):
+	def Reconstruction_Block(self, coeff, batchsize, in_texture = None, align_img = None):
 
 		self.uv = tf.constant(np.tile(np.expand_dims(np.load(os.path.join(self.bfm_path, 'uv.npy')).astype(np.float32), 0), (batchsize, 1, 1))) * 255 # uv of each index [N, 3]
 		#coeff: [batchsize,257] reconstruction coefficients
@@ -77,6 +79,13 @@ class Face3D():
 		render_uvs = tf.clip_by_value(render_uvs,0,255)
 		render_uvs = tf.cast(render_uvs,tf.float32) 
 		self.render_uvs = render_uvs
+
+		# reconstruction 
+		if not (align_img is None):
+			recon_textures = self.Texture_block(face_shape_t, norm_r, self.facemodel, align_img, batchsize)
+			# recon_textures = tf.clip_by_value(recon_textures,0,255)
+			recon_textures = tf.cast(recon_textures,tf.float32) 
+			self.recon_textures = recon_textures
 
 
 	######################################################################################################
@@ -369,3 +378,58 @@ class Face3D():
 				far_clip = far_clip)
 
 		return img
+
+	def ClipSpace_to_ScreenSpace(self, vertices, image_width, image_height):
+		'''
+			return vertices has shape of batchsize * N * 4
+			for each vertices, we have x, y, z, w
+		'''
+		x = vertices[:, :, 0]
+		y = vertices[:, :, 1]
+		z = vertices[:, :, 2]
+		w = vertices[:, :, 3]
+		x_screen = (x / w + 1) * 0.5 * image_width
+		y_screen = (y / w + 1) * 0.5 * image_height
+		z_screen = z / w
+		w_screen = 1 / w
+		vertices_screen = tf.stack([x_screen, y_screen, z_screen, w_screen], axis = 2)
+		return vertices_screen
+
+	def Texture_block(self, face_shape, face_norm, facemodel, align_image, batchsize):
+		# render reconstruction images 
+		n_vex = int(facemodel.idBase.shape[0].value/3)
+		fov_y = 2*tf.atan(112/(1015.))*180./m.pi + tf.zeros([batchsize])
+
+		# full face region
+		face_shape = tf.reshape(face_shape,[batchsize,n_vex,3])
+		face_norm = tf.reshape(face_norm,[batchsize,n_vex,3])
+
+		#cammera settings
+		# same as in Projection_block
+		camera_position = tf.constant([[0,0,10.0]]) + tf.zeros([batchsize,3])
+		camera_lookat = tf.constant([[0,0,0.0]]) + tf.zeros([batchsize,3])
+		camera_up = tf.constant([[0,1.0,0]]) + tf.zeros([batchsize,3])
+
+		near_clip = 0.01*tf.ones([batchsize])
+		far_clip = 50*tf.ones([batchsize])
+
+		with tf.device('/cpu:0'):
+			vertices = mesh_renderer.clip_vertices(face_shape,
+				camera_position = camera_position,
+				camera_lookat = camera_lookat,
+				camera_up = camera_up,
+				image_width = 224,
+				image_height = 224,
+				fov_y = fov_y,
+				near_clip = near_clip,
+				far_clip = far_clip)
+
+			vertices_screen = self.ClipSpace_to_ScreenSpace(vertices, 224, 224)
+			vertices_color = interpolate_bilinear(tf.image.flip_up_down(align_image), vertices_screen[:, :, :2], 'xy')
+			uv_clip_space = self.uv[:, :, :2] * 2 / 255 - 1
+			zeros = tf.zeros_like(tf.expand_dims(uv_clip_space[:, :, 0], -1))
+			ones = tf.ones_like(tf.expand_dims(uv_clip_space[:, :, 0], -1))
+			uv_clip_space = tf.concat([uv_clip_space, zeros, ones], axis = 2)
+			texture = mesh_renderer.rasterize_texture(uv_clip_space, vertices_color, tf.cast(facemodel.face_buf-1,tf.int32), 256, 256)
+
+		return texture

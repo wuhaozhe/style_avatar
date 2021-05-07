@@ -337,8 +337,12 @@ def test():
     video_file.write(video)
     video_file.close()
     frames = read_video("test.mp4")
-    coeff = deep_3drecon.recon_coeff(frames, lm)
-    deep_3drecon.recon_uv_from_coeff(coeff, "test3.mp4")
+    # coeff, align_img = deep_3drecon.recon_coeff(frames, lm, return_image = True)
+    
+    # deep_3drecon.recon_uv_from_coeff(coeff, "test3.mp4")
+    frames = frames[0:128]
+    lm = lm[0:128]
+    deep_3drecon.recon_texture(frames, lm)
     
 
 if __name__ == "__main__":
