@@ -478,6 +478,17 @@ def mesh_uv(vertices,
   uv_images = pixel_attributes
   return uv_images
 
+def rasterize_texture(
+  uvcoords,
+  colors,
+  triangles,
+  image_width,
+  image_height,
+):
+  vertex_attributes = tf.concat([colors], axis=2)
+  pixel_attributes = rasterize_triangles.rasterize_clip_space(uvcoords, vertex_attributes, triangles, image_width, image_height, [0] * vertex_attributes.shape[2].value)
+  return pixel_attributes
+
 def clip_vertices(vertices,
                   camera_position,
                   camera_lookat,
