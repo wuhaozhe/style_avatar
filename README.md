@@ -65,3 +65,8 @@ def test():
 
 ------
 ### Deep3DReconstruction
+We refer to the [Deep3DFaceReconstruction](https://github.com/microsoft/Deep3DFaceReconstruction) to conduct the face reconstruction. 
+We implement several batch-wise api in `deep_3drecon/utils.py`, including UV image generation and RGB texture generation. 
+
+
+Notice that the function `recon_texture` generates texture through aligning input image and 3D model, rather than generating texture from 3DMM space.
