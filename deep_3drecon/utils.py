@@ -1,3 +1,5 @@
+import sys
+sys.path.append("..")
 import tensorflow as tf 
 import numpy as np
 import cv2
@@ -5,7 +7,7 @@ import os
 import time
 from scipy.io import loadmat,savemat
 from tqdm import tqdm
-from .align_img import align
+from align_img import align
 from .face_decoder import Face3D
 
 def load_graph(graph_filename):

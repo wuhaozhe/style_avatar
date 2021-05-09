@@ -3,6 +3,7 @@ import cv2
 from scipy.io import loadmat,savemat
 from PIL import Image
 
+#TODO: refractor, support get translation from lm 5 and translate lm 68, put this file outof deep3drecon
 #calculating least square problem
 def POS(xp,x):
 	npts = xp.shape[1]
