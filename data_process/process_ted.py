@@ -345,17 +345,24 @@ def test():
         audio_file = open("test.wav", "wb")
         video_file.write(video)
         audio_file.write(audio)
-        # video_file.close()
-        # audio_file.close()
-        print(txn.stat(db=train_video))
-        print(txn.stat(db=test_video))
+        video_file.close()
+        audio_file.close()
+        # print(txn.stat(db=train_video))
+        # print(txn.stat(db=test_video))
     
-    # lm = pkl.load(BytesIO(lm))
-    # video_file = open("test.mp4", "wb")
-    # video_file.write(video)
-    # video_file.close()
-    # frames = read_video("test.mp4")
-    # coeff, align_img = deep_3drecon.recon_coeff(frames, lm, return_image = True)
+    lm = pkl.load(BytesIO(lm))
+    video_file = open("test.mp4", "wb")
+    video_file.write(video)
+    video_file.close()
+    frames = read_video("test.mp4")
+    reconstructor = deep_3drecon.Reconstructor()
+    # coeff, align_img = reconstructor.recon_coeff(frames, lm, return_image = True)
+    # reconstructor.recon_uv_from_coeff(coeff, "test2.mp4")
+    # reconstructor.recon_video_from_coeff_notex(coeff, "test2.mp4")
+    reconstructor.recon_texture(frames, lm, out_path = "test2.mp4")
+    # print(coeff.shape, align_img.shape)
+    # reconstructor.recon_video(frames, lm, out_path = "test2.mp4")
+
     
     # deep_3drecon.recon_uv_from_coeff(coeff, "test3.mp4")
     # frames = frames[0:128]
@@ -364,5 +371,5 @@ def test():
     
 
 if __name__ == "__main__":
-    main()
-    # test()
+    # main()
+    test()
