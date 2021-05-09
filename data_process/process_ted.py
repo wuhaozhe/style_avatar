@@ -166,7 +166,6 @@ def fine_slice():
     '''
         cut slices to more fine-grained piece according to scene change and face size
         save results to folders
-        TODO: save landmark 68
     '''
     src_video_path = "../data/ted_hd/slice_video_coarse"
     dst_video_path = "../data/ted_hd/slice_video_fine"
@@ -303,19 +302,29 @@ def get_features(wnum = 8):
             rgb texture
             uv map
             mouth region mask
-            lm 68
+            eye gaussian heat map
+            need to filter pose of coeff (low pass filter)
         For audio:
             deepspeech feature
             energy feature
     '''
-    pass
+    lmdb_path = "../data/ted_hd/lmdb"
+    env = lmdb.open(lmdb_path, map_size=1099511627776, max_dbs = 64)
+    train_video = env.open_db("train_video".encode())
+    test_video = env.open_db("test_video".encode())
+    
+    with env.begin(write = False) as txn:
+        train_len = txn.stat(db=train_video)['entries']
+        test_len = txn.stat(db=test_video)['entries']
+
+    
 
 def main():
     # coarse_slice()
     # detect(4)
-    fine_slice()
-    split_train_test()
-    # get_features()
+    # fine_slice()
+    # split_train_test()
+    get_features()
 
 def test():
     lmdb_path = "../data/ted_hd/lmdb"
@@ -331,27 +340,27 @@ def test():
     with env.begin(write = False) as txn:
         video = txn.get(str(0).encode(), db=test_video)
         lm = txn.get(str(0).encode(), db=test_lm5)
-        # audio = txn.get(str(0).encode(), db=test_audio)
-        # video_file = open("test.mp4", "wb")
-        # audio_file = open("test.wav", "wb")
-        # video_file.write(video)
-        # audio_file.write(audio)
+        audio = txn.get(str(0).encode(), db=test_audio)
+        video_file = open("test.mp4", "wb")
+        audio_file = open("test.wav", "wb")
+        video_file.write(video)
+        audio_file.write(audio)
         # video_file.close()
         # audio_file.close()
-        # print(txn.stat(db=train_video))
-        # print(txn.stat(db=test_video))
+        print(txn.stat(db=train_video))
+        print(txn.stat(db=test_video))
     
-    lm = pkl.load(BytesIO(lm))
-    video_file = open("test.mp4", "wb")
-    video_file.write(video)
-    video_file.close()
-    frames = read_video("test.mp4")
+    # lm = pkl.load(BytesIO(lm))
+    # video_file = open("test.mp4", "wb")
+    # video_file.write(video)
+    # video_file.close()
+    # frames = read_video("test.mp4")
     # coeff, align_img = deep_3drecon.recon_coeff(frames, lm, return_image = True)
     
     # deep_3drecon.recon_uv_from_coeff(coeff, "test3.mp4")
-    frames = frames[0:128]
-    lm = lm[0:128]
-    deep_3drecon.recon_texture(frames, lm)
+    # frames = frames[0:128]
+    # lm = lm[0:128]
+    # deep_3drecon.recon_texture(frames, lm)
     
 
 if __name__ == "__main__":
