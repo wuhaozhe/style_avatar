@@ -18,7 +18,7 @@ def load_graph(graph_filename):
 	return graph_def
 
 # load landmarks for standard face, which is used for image preprocessing
-def load_lm3d():
+def load_lm3d(bfm_dir):
 
 	Lm3D = loadmat(os.path.join(bfm_dir, 'similarity_Lm3D_all.mat'))
 	Lm3D = Lm3D['lm']
@@ -30,35 +30,7 @@ def load_lm3d():
 
 	return Lm3D
 
-
-bfm_dir = os.path.join(os.path.dirname(__file__), 'BFM')
-network_dir = os.path.join(os.path.dirname(__file__), 'network')
-lm3D = load_lm3d()
-batchsize = 128
-g = tf.Graph()
-
-with g.as_default() as graph,tf.device('/gpu:0'):
-    FaceReconstructor = Face3D(bfm_dir)
-    images = tf.placeholder(name = 'input_imgs', shape = [batchsize,224,224,3], dtype = tf.float32)
-    graph_def = load_graph(os.path.join(network_dir, 'FaceReconModel.pb'))
-    tf.import_graph_def(graph_def,name='resnet',input_map={'input_imgs:0': images})
-
-    # output coefficients of R-Net (dim = 257) 
-    coeff = graph.get_tensor_by_name('resnet/coeff:0')
-    # reconstructing faces
-    id_coeff,ex_coeff,tex_coeff,angles,translation,gamma = FaceReconstructor.Split_coeff(coeff)
-    FaceReconstructor.Reconstruction_Block(coeff,batchsize, None, images)
-    face_shape = FaceReconstructor.face_shape_t
-    face_texture = FaceReconstructor.face_texture
-    face_color = FaceReconstructor.face_color
-    landmarks_2d = FaceReconstructor.landmark_p
-    recon_img = FaceReconstructor.render_imgs
-    tri = FaceReconstructor.facemodel.face_buf
-    uv_img = FaceReconstructor.render_uvs
-    recon_textures = FaceReconstructor.recon_textures
-
-
-def pad_frame(frame_batch):
+def pad_frame(frame_batch, batchsize):
     '''
         pad frame to batchsize
     '''
@@ -66,7 +38,7 @@ def pad_frame(frame_batch):
     frame_batch = np.concatenate((frame_batch, frame_zeros), axis=0)
     return frame_batch
 
-def pad_lm(lm_batch):
+def pad_lm(lm_batch, batchsize):
     '''
         pad landmark to batchsize
     '''
@@ -74,7 +46,7 @@ def pad_lm(lm_batch):
     lm_batch = np.concatenate((lm_batch, lm_zeros), axis=0)
     return lm_batch
 
-def pad_coeff(coeff_batch):
+def pad_coeff(coeff_batch, batchsize):
     '''
         pad coeff to batchsize
     '''
@@ -82,173 +54,205 @@ def pad_coeff(coeff_batch):
     coeff_batch = np.concatenate((coeff_batch, coeff_zeros), axis=0)
     return coeff_batch
 
-def recon_coeff(frame_array, lm_array, return_image = False):
-    with g.as_default() as graph, tf.device('/gpu:0'):
-        with tf.Session() as sess:
-            idx = 0
-            while idx < len(frame_array):
-                if idx + batchsize <= len(frame_array):
-                    end_idx = batchsize
-                    frame_batch = frame_array[idx: idx + batchsize]
-                    lm_batch = lm_array[idx: idx + batchsize]
-                else:
-                    # pad
-                    end_idx = len(frame_array) - idx
-                    frame_batch = pad_frame(frame_array[idx: ])
-                    lm_batch = pad_lm(lm_array[idx: ])
+class Reconstructor():
+    def __init__(self):
 
-                input_img_list = []
-                for i in range(batchsize):
-                    input_img,lm_new,transform_params = align(frame_batch[i],lm_batch[i],lm3D)
-                    input_img_list.append(input_img)
-                
-                input_img_array = np.concatenate(input_img_list, axis = 0)
-                coeff_, id_coeff_, ex_coeff_, tex_coeff_, angles_, translation_, gamma_ = sess.run([coeff,\
-					id_coeff,ex_coeff,tex_coeff,angles,translation,gamma],feed_dict = {images: input_img_array})
-                
-                if idx == 0:
-                    input_array = input_img_array[:end_idx]
-                    coeff_array = coeff_[:end_idx]
-                else:
-                    input_array = np.concatenate((input_array, input_img_array[:end_idx]), axis = 0)
-                    coeff_array = np.concatenate((coeff_array, coeff_[:end_idx]), axis = 0)
+        self.bfm_dir = os.path.join(os.path.dirname(__file__), 'BFM')
+        self.network_dir = os.path.join(os.path.dirname(__file__), 'network')
+        self.lm3D = load_lm3d(self.bfm_dir)
+        self.batchsize = 128
+        self.g = tf.Graph()
 
-                idx += batchsize
+        with self.g.as_default() as graph,tf.device('/gpu:0'):
+            FaceReconstructor = Face3D(self.bfm_dir)
+            self.images = tf.placeholder(name = 'input_imgs', shape = [self.batchsize,224,224,3], dtype = tf.float32)
+            self.graph_def = load_graph(os.path.join(self.network_dir, 'FaceReconModel.pb'))
+            tf.import_graph_def(self.graph_def,name='resnet',input_map={'input_imgs:0': self.images})
 
-        if return_image:
-            return coeff_array, input_array
-        else:
-            return coeff_array
+            # output coefficients of R-Net (dim = 257) 
+            self.coeff = graph.get_tensor_by_name('resnet/coeff:0')
+            # reconstructing faces
+            FaceReconstructor.Reconstruction_Block(self.coeff,self.batchsize, None, self.images)
+            self.face_shape = FaceReconstructor.face_shape_t
+            self.face_texture = FaceReconstructor.face_texture
+            self.face_color = FaceReconstructor.face_color
+            self.landmarks_2d = FaceReconstructor.landmark_p
+            self.recon_img = FaceReconstructor.render_imgs
+            self.tri = FaceReconstructor.facemodel.face_buf
+            self.uv_img = FaceReconstructor.render_uvs
+            self.recon_textures = FaceReconstructor.recon_textures
 
-def recon_video_from_coeff(coeff_array, out_path = "test.mp4", tmp_dir = "./test"):
 
-    with g.as_default() as graph, tf.device('/gpu:0'):
-        if not os.path.exists(tmp_dir):
-            os.makedirs(tmp_dir)
 
-        FaceReconstructor = Face3D(bfm_dir)
-        batchsize = 1
-        coeff = tf.placeholder(name = 'input_coeff', shape = [batchsize, 257], dtype = tf.float32)
+    def recon_coeff(self, frame_array, lm_array, return_image = False):
+        with self.g.as_default() as graph, tf.device('/gpu:0'):
+            with tf.Session() as sess:
+                idx = 0
+                while idx < len(frame_array):
+                    if idx + self.batchsize <= len(frame_array):
+                        end_idx = self.batchsize
+                        frame_batch = frame_array[idx: idx + self.batchsize]
+                        lm_batch = lm_array[idx: idx + self.batchsize]
+                    else:
+                        # pad
+                        end_idx = len(frame_array) - idx
+                        frame_batch = pad_frame(frame_array[idx: ], self.batchsize)
+                        lm_batch = pad_lm(lm_array[idx: ], self.batchsize)
 
-        FaceReconstructor.Reconstruction_Block(coeff, batchsize)
-        recon_img = FaceReconstructor.render_imgs
-        with tf.Session() as sess:
-            image_array = []
-            os.system("rm {}".format(os.path.join(tmp_dir, "*.jpg")))
-            for idx, coeff_ in tqdm(enumerate(coeff_array)):
-                recon_img_ = sess.run([recon_img], feed_dict = {coeff: np.expand_dims(coeff_, 0)})
-                recon_img_ = recon_img_[0][0]
-                image_array.append(recon_img_)
-                cv2.imwrite("{}/{}.jpg".format(tmp_dir, idx), recon_img_[:, :, :3][:, :, ::-1])
+                    input_img_list = []
+                    for i in range(self.batchsize):
+                        input_img,lm_new,transform_params = align(frame_batch[i],lm_batch[i],self.lm3D)
+                        input_img_list.append(input_img)
+                    
+                    input_img_array = np.concatenate(input_img_list, axis = 0)
+                    coeff_ = sess.run([self.coeff],feed_dict = {self.images: input_img_array})
+                    coeff_ = coeff_[0]
+                    
+                    if idx == 0:
+                        input_array = input_img_array[:end_idx]
+                        coeff_array = coeff_[:end_idx]
+                    else:
+                        input_array = np.concatenate((input_array, input_img_array[:end_idx]), axis = 0)
+                        coeff_array = np.concatenate((coeff_array, coeff_[:end_idx]), axis = 0)
 
-            os.system("ffmpeg -loglevel warning -framerate 25 -start_number 0 -i {}/%d.jpg -c:v libx264 -b:v 2000k {}".format(tmp_dir, out_path))
+                    idx += self.batchsize
 
-def recon_video_from_coeff_notex(coeff_array, out_path = "test.mp4", tmp_dir = "./test"):
-    with tf.Graph().as_default() as graph, tf.device('/gpu:0'):
-        if not os.path.exists(tmp_dir):
-            os.makedirs(tmp_dir)
+            if return_image:
+                return coeff_array, input_array
+            else:
+                return coeff_array
 
-        FaceReconstructor = Face3D(bfm_dir)
-        batchsize = 1
-        coeff = tf.placeholder(name = 'input_coeff', shape = [batchsize, 257], dtype = tf.float32)
-        texture = tf.placeholder(name = 'input_texture', shape = [batchsize, 35709, 3], dtype = tf.float32)
-
-        # reconstructing faces
-        FaceReconstructor.Reconstruction_Block(coeff, batchsize, texture)
-        recon_img = FaceReconstructor.render_imgs
-        with tf.Session() as sess:
-            image_array = []
-            os.system("rm {}".format(os.path.join(tmp_dir, "*.jpg")))
-            norm_texture = np.ones((batchsize, 35709, 3), dtype = np.float32) * 128
-            for idx, coeff_ in tqdm(enumerate(coeff_array)):
-                recon_img_ = sess.run([recon_img], feed_dict = {coeff: np.expand_dims(coeff_, 0), texture: norm_texture})
-                recon_img_ = recon_img_[0][0]
-                image_array.append(recon_img_)
-                cv2.imwrite("{}/{}.jpg".format(tmp_dir, idx), recon_img_[:, :, :3][:, :, ::-1])
-
-            os.system("ffmpeg -y -loglevel warning -framerate 25 -start_number 0 -i {}/%d.jpg -c:v libx264 -b:v 2000k {}".format(tmp_dir, out_path))
-
-def recon_video(frame_array, lm_array, out_path = "test.mp4"):
-    coeff_array = recon_coeff(frame_array, lm_array)
-    recon_video_from_coeff(coeff_array, out_path)
-
-def recon_uv(frame_array, lm_array, out_path = "test.mp4", tmp_dir = "./test"):
-    coeff_array = recon_coeff(frame_array, lm_array)
-    recon_uv_from_coeff(coeff_array, out_path, tmp_dir)
-
-def recon_uv_from_coeff(coeff_array, out_path = "test.mp4", tmp_dir = "./test"):
-    with g.as_default() as graph, tf.device('/gpu:0'):
-        with tf.Session() as sess:
+    def recon_video_from_coeff(self, coeff_array, out_path = "test.mp4", tmp_dir = "./test"):
+        # use local face reconstructor
+        with tf.Graph().as_default() as graph, tf.device('/gpu:0'):
             if not os.path.exists(tmp_dir):
                 os.makedirs(tmp_dir)
-            idx = 0
-            while idx < len(coeff_array):
-                if idx + batchsize <= len(coeff_array):
-                    end_idx = batchsize
-                    coeff_batch = coeff_array[idx: idx + batchsize]
-                else:
-                    # pad
-                    end_idx = len(coeff_array) - idx
-                    coeff_batch = pad_coeff(coeff_array[idx: ])
 
-                uv_img_ = sess.run([uv_img],feed_dict = {coeff: coeff_batch})
-                uv_img_ = uv_img_[0]
-                
-                if idx == 0:
-                    uv_array = uv_img_[:end_idx]
-                else:
-                    uv_array = np.concatenate((uv_array, uv_img_[:end_idx]), axis = 0)
+            FaceReconstructor = Face3D(self.bfm_dir)
+            batchsize = 1
+            coeff = tf.placeholder(name = 'input_coeff', shape = [batchsize, 257], dtype = tf.float32)
 
-                idx += batchsize
-                
-            os.system("rm {}".format(os.path.join(tmp_dir, "*.jpg")))
+            FaceReconstructor.Reconstruction_Block(coeff, batchsize)
+            recon_img = FaceReconstructor.render_imgs
+            with tf.Session() as sess:
+                image_array = []
+                os.system("rm {}".format(os.path.join(tmp_dir, "*.jpg")))
+                for idx, coeff_ in tqdm(enumerate(coeff_array)):
+                    recon_img_ = sess.run([recon_img], feed_dict = {coeff: np.expand_dims(coeff_, 0)})
+                    recon_img_ = recon_img_[0][0]
+                    image_array.append(recon_img_)
+                    cv2.imwrite("{}/{}.jpg".format(tmp_dir, idx), recon_img_[:, :, :3][:, :, ::-1])
 
-            for i in range(len(uv_array)):
-                tmp_uv_img = uv_array[i][::-1, :, :]
-                cv2.imwrite("{}/{}.png".format(tmp_dir, i), tmp_uv_img)
+                os.system("ffmpeg -loglevel warning -framerate 25 -start_number 0 -i {}/%d.jpg -c:v libx264 -b:v 2000k {}".format(tmp_dir, out_path))
 
-            os.system("ffmpeg -loglevel warning -y -framerate 25 -start_number 0 -i {}/%d.png -c:v libx264 -pix_fmt yuv420p -b:v 1000k {}".format(tmp_dir, out_path))
+    def recon_video(self, frame_array, lm_array, out_path = "test.mp4"):
+        coeff_array = self.recon_coeff(frame_array, lm_array)
+        self.recon_video_from_coeff(coeff_array, out_path)
 
-# given uv img array and img array, generate texture image
-def recon_texture_from_coeff(coeff_array, img_array, out_path = "test.mp4", tmp_dir = "./test"):
-    '''
-        reconstruct texture from reconstructed coeff and aligned image
-    '''
-    with g.as_default() as graph, tf.device('/gpu:0'):
-        with tf.Session() as sess:
+    def recon_video_from_coeff_notex(self, coeff_array, out_path = "test.mp4", tmp_dir = "./test"):
+        # use local face reconstructor
+        with tf.Graph().as_default() as graph, tf.device('/gpu:0'):
             if not os.path.exists(tmp_dir):
                 os.makedirs(tmp_dir)
-            idx = 0
-            while idx < len(coeff_array):
-                if idx + batchsize <= len(coeff_array):
-                    end_idx = batchsize
-                    coeff_batch = coeff_array[idx: idx + batchsize]
-                    img_batch = img_array[idx: idx + batchsize]
-                else:
-                    # pad
-                    end_idx = len(coeff_array) - idx
-                    coeff_batch = pad_coeff(coeff_array[idx: ])
-                    img_batch = pad_frame(img_array[idx: ])
 
-                texture = sess.run([recon_textures], feed_dict = {coeff: coeff_batch, images: img_batch})
-                texture = texture[0].astype(np.uint8)
+            FaceReconstructor = Face3D(self.bfm_dir)
+            batchsize = 1
+            coeff = tf.placeholder(name = 'input_coeff', shape = [batchsize, 257], dtype = tf.float32)
+            texture = tf.placeholder(name = 'input_texture', shape = [batchsize, 35709, 3], dtype = tf.float32)
 
-                if idx == 0:
-                    texture_array = texture[:end_idx]
-                else:
-                    texture_array = np.concatenate((texture_array, texture[:end_idx]), axis = 0)
+            # reconstructing faces
+            FaceReconstructor.Reconstruction_Block(coeff, batchsize, texture)
+            recon_img = FaceReconstructor.render_imgs
+            with tf.Session() as sess:
+                image_array = []
+                os.system("rm {}".format(os.path.join(tmp_dir, "*.jpg")))
+                norm_texture = np.ones((batchsize, 35709, 3), dtype = np.float32) * 128
+                for idx, coeff_ in tqdm(enumerate(coeff_array)):
+                    recon_img_ = sess.run([recon_img], feed_dict = {coeff: np.expand_dims(coeff_, 0), texture: norm_texture})
+                    recon_img_ = recon_img_[0][0]
+                    image_array.append(recon_img_)
+                    cv2.imwrite("{}/{}.jpg".format(tmp_dir, idx), recon_img_[:, :, :3][:, :, ::-1])
 
-                idx += batchsize
-
-            os.system("rm {}".format(os.path.join(tmp_dir, "*.jpg")))
-
-            for i in range(len(texture_array)):
-                tmp_texture_img = texture_array[i][::-1, :, :]
-                cv2.imwrite("{}/{}.png".format(tmp_dir, i), tmp_texture_img)
-
-            os.system("ffmpeg -loglevel warning -y -framerate 25 -start_number 0 -i {}/%d.png -c:v libx264 -pix_fmt yuv420p -b:v 1000k {}".format(tmp_dir, out_path))
+                os.system("ffmpeg -y -loglevel warning -framerate 25 -start_number 0 -i {}/%d.jpg -c:v libx264 -b:v 2000k {}".format(tmp_dir, out_path))
 
 
-def recon_texture(frame_array, lm_array, out_path = "test.mp4", tmp_dir = "./test"):
-    coeff, align_img = recon_coeff(frame_array, lm_array, return_image = True)
-    recon_texture_from_coeff(coeff, align_img)
+    def recon_uv(self, frame_array, lm_array, out_path = "test.mp4", tmp_dir = "./test"):
+        coeff_array = self.recon_coeff(frame_array, lm_array)
+        self.recon_uv_from_coeff(coeff_array, out_path, tmp_dir)
+
+    def recon_uv_from_coeff(self, coeff_array, out_path = "test.mp4", tmp_dir = "./test"):
+        with self.g.as_default() as graph, tf.device('/gpu:0'):
+            with tf.Session() as sess:
+                if not os.path.exists(tmp_dir):
+                    os.makedirs(tmp_dir)
+                idx = 0
+                while idx < len(coeff_array):
+                    if idx + self.batchsize <= len(coeff_array):
+                        end_idx = self.batchsize
+                        coeff_batch = coeff_array[idx: idx + self.batchsize]
+                    else:
+                        # pad
+                        end_idx = len(coeff_array) - idx
+                        coeff_batch = pad_coeff(coeff_array[idx: ], self.batchsize)
+
+                    uv_img_ = sess.run([self.uv_img],feed_dict = {self.coeff: coeff_batch})
+                    uv_img_ = uv_img_[0]
+                    
+                    if idx == 0:
+                        uv_array = uv_img_[:end_idx]
+                    else:
+                        uv_array = np.concatenate((uv_array, uv_img_[:end_idx]), axis = 0)
+
+                    idx += self.batchsize
+                    
+                os.system("rm {}".format(os.path.join(tmp_dir, "*.jpg")))
+
+                for i in range(len(uv_array)):
+                    tmp_uv_img = uv_array[i][::-1, :, :]
+                    cv2.imwrite("{}/{}.png".format(tmp_dir, i), tmp_uv_img)
+
+                os.system("ffmpeg -loglevel warning -y -framerate 25 -start_number 0 -i {}/%d.png -c:v libx264 -pix_fmt yuv420p -b:v 1000k {}".format(tmp_dir, out_path))
+
+    # given uv img array and img array, generate texture image
+    def recon_texture_from_coeff(self, coeff_array, img_array, out_path = "test.mp4", tmp_dir = "./test"):
+        '''
+            reconstruct texture from reconstructed coeff and aligned image
+        '''
+        with self.g.as_default() as graph, tf.device('/gpu:0'):
+            with tf.Session() as sess:
+                if not os.path.exists(tmp_dir):
+                    os.makedirs(tmp_dir)
+                idx = 0
+                while idx < len(coeff_array):
+                    if idx + self.batchsize <= len(coeff_array):
+                        end_idx = self.batchsize
+                        coeff_batch = coeff_array[idx: idx + self.batchsize]
+                        img_batch = img_array[idx: idx + self.batchsize]
+                    else:
+                        # pad
+                        end_idx = len(coeff_array) - idx
+                        coeff_batch = pad_coeff(coeff_array[idx: ], self.batchsize)
+                        img_batch = pad_frame(img_array[idx: ], self.batchsize)
+
+                    texture = sess.run([self.recon_textures], feed_dict = {self.coeff: coeff_batch, self.images: img_batch})
+                    texture = texture[0].astype(np.uint8)
+
+                    if idx == 0:
+                        texture_array = texture[:end_idx]
+                    else:
+                        texture_array = np.concatenate((texture_array, texture[:end_idx]), axis = 0)
+
+                    idx += self.batchsize
+
+                os.system("rm {}".format(os.path.join(tmp_dir, "*.jpg")))
+
+                for i in range(len(texture_array)):
+                    tmp_texture_img = texture_array[i][::-1, :, :]
+                    cv2.imwrite("{}/{}.png".format(tmp_dir, i), tmp_texture_img)
+
+                os.system("ffmpeg -loglevel warning -y -framerate 25 -start_number 0 -i {}/%d.png -c:v libx264 -pix_fmt yuv420p -b:v 1000k {}".format(tmp_dir, out_path))
+
+
+    def recon_texture(self, frame_array, lm_array, out_path = "test.mp4", tmp_dir = "./test"):
+        coeff, align_img = self.recon_coeff(frame_array, lm_array, return_image = True)
+        self.recon_texture_from_coeff(coeff, align_img, out_path, tmp_dir)
