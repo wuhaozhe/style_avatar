@@ -71,3 +71,25 @@ def align(img, lm, lm3D):
 	trans_params = np.array([w0,h0,102.0/s,t[0],t[1]])
 
 	return img_new,lm_new,trans_params
+
+
+def align_lm68(lm5_list, lm68_list, lm3D, w0, h0, target_size = 224.):
+	'''
+		batch wise lm and lm 68
+	'''
+	lm68_new_list = []
+	for i in range(len(lm5_list)):
+		lm5 = lm5_list[i]
+		lm68 = lm68_list[i]
+		lm5 = np.stack([lm5[:,0],h0 - 1 - lm5[:,1]], axis = 1)
+		lm68 = np.stack([lm68[:,0],h0 - 1 - lm68[:,1]], axis = 1)
+		t,s = POS(lm5.transpose(),lm3D.transpose())
+
+		w = (w0/s*102).astype(np.int32)
+		h = (h0/s*102).astype(np.int32)
+		lm68_new = np.stack([lm68[:,0] - t[0] + w0/2,lm68[:,1] - t[1] + h0/2],axis = 1)/s*102
+		lm68_new = lm68_new - np.reshape(np.array([(w/2 - target_size/2),(h/2-target_size/2)]),[1,2])
+		lm68_new = np.stack([lm68_new[:,0], 223 - lm68_new[:,1]], axis = 1)
+		lm68_new_list.append(lm68_new)
+
+	return np.array(lm68_new_list)

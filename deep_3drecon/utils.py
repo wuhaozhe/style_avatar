@@ -143,7 +143,7 @@ class Reconstructor():
                     image_array.append(recon_img_)
                     cv2.imwrite("{}/{}.jpg".format(tmp_dir, idx), recon_img_[:, :, :3][:, :, ::-1])
 
-                os.system("ffmpeg -loglevel warning -framerate 25 -start_number 0 -i {}/%d.jpg -c:v libx264 -b:v 2000k {}".format(tmp_dir, out_path))
+                os.system("ffmpeg -y -loglevel warning -framerate 25 -start_number 0 -i {}/%d.jpg -c:v libx264 -b:v 2000k {}".format(tmp_dir, out_path))
 
     def recon_video(self, frame_array, lm_array, out_path = "test.mp4"):
         coeff_array = self.recon_coeff(frame_array, lm_array)
@@ -180,7 +180,10 @@ class Reconstructor():
         coeff_array = self.recon_coeff(frame_array, lm_array)
         self.recon_uv_from_coeff(coeff_array, out_path, tmp_dir)
 
-    def recon_uv_from_coeff(self, coeff_array, out_path = "test.mp4", tmp_dir = "./test"):
+    def recon_uv_from_coeff(self, coeff_array, out_path = "test.mp4", tmp_dir = "./test", bg_path = None):
+        '''
+            if bg path is not none, also write background video
+        '''
         with self.g.as_default() as graph, tf.device('/gpu:0'):
             with tf.Session() as sess:
                 if not os.path.exists(tmp_dir):
@@ -210,8 +213,13 @@ class Reconstructor():
                 for i in range(len(uv_array)):
                     tmp_uv_img = uv_array[i][::-1, :, :]
                     cv2.imwrite("{}/{}.png".format(tmp_dir, i), tmp_uv_img)
+                    if not (bg_path is None):
+                        num_labels, labels = cv2.connectedComponents((tmp_uv_img[:, :, 0] == 0).astype(np.uint8))
+                        cv2.imwrite(os.path.join(tmp_dir, "{}_bg.png".format(i)), (labels == 1).astype(np.uint8) * 255)
 
                 os.system("ffmpeg -loglevel warning -y -framerate 25 -start_number 0 -i {}/%d.png -c:v libx264 -pix_fmt yuv420p -b:v 1000k {}".format(tmp_dir, out_path))
+                if not (bg_path is None):
+                    os.system("ffmpeg -loglevel warning -y -framerate 25 -start_number 0 -i {}/%d_bg.png -c:v libx264 -pix_fmt yuv420p -b:v 1000k {}".format(tmp_dir, bg_path))
 
     # given uv img array and img array, generate texture image
     def recon_texture_from_coeff(self, coeff_array, img_array, out_path = "test.mp4", tmp_dir = "./test"):
