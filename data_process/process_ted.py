@@ -14,8 +14,10 @@ import soundfile as sf
 import deep_3drecon
 from moviepy.editor import VideoFileClip
 from tqdm import tqdm
-from utils import lm68_2_lm5_batch, mean_eye_distance, read_video
+from utils import lm68_2_lm5_batch, mean_eye_distance, read_video, write_video, filter_norm_coeff, lm68_mouth_contour
 from io import BytesIO
+from multiprocessing import Process
+from align_img import align_lm68, align
 
 '''
     the process of ted hd dataset contains the following stages:
@@ -289,10 +291,109 @@ def split_train_test():
                     test_cnt += 1
 
 
-def get_features_worker(wid):
+def recon3d_worker(wid, data_list, train):
+    if wid == 0:
+        data_list = tqdm(data_list)
+
+    lmdb_path = "../data/ted_hd/lmdb"
+    env = lmdb.open(lmdb_path, map_size=1099511627776, max_dbs = 64)
+    if train:
+        video_data = env.open_db("train_video".encode())
+        lm5_data = env.open_db("train_lm5".encode())
+        lm68_data = env.open_db("train_lm68".encode())
+        align_data = env.open_db("train_align".encode())
+        uv_data = env.open_db("train_uv".encode())
+        bg_data = env.open_db("train_bg".encode())
+        texture_data = env.open_db("train_texture".encode())
+        coeff_data = env.open_db("train_coeff".encode())
+        coeff_norm_data = env.open_db("train_coeff_norm".encode())
+        mouth_data = env.open_db("train_mouth".encode())
+    else:
+        video_data = env.open_db("test_video".encode())
+        lm5_data = env.open_db("test_lm5".encode())
+        lm68_data = env.open_db("test_lm68".encode())
+        align_data = env.open_db("test_align".encode())
+        uv_data = env.open_db("test_uv".encode())
+        bg_data = env.open_db("test_bg".encode())
+        texture_data = env.open_db("test_texture".encode())
+        coeff_norm_data = env.open_db("test_coeff_norm".encode())
+        mouth_data = env.open_db("test_mouth".encode())
+
+    tmp_dir = "../data/tmp/{}".format(wid)
+    if not os.path.exists(tmp_dir):
+        os.makedirs(tmp_dir)
+    
+    os.environ["CUDA_VISIBLE_DEVICES"]=str(wid % 4)
+    face_reconstructor = deep_3drecon.Reconstructor()
+
+    for data_name in data_list:
+        txn = env.begin(write = False)
+        video_bin = txn.get(str(data_name).encode(), db=video_data)
+        lm5_bin = txn.get(str(data_name).encode(), db=lm5_data)
+        lm68_bin = txn.get(str(data_name).encode(), db=lm68_data)
+        txn.abort()
+        video_file = open("../data/tmp/{}_src.mp4".format(wid), "wb")
+        video_file.write(video_bin)
+        video_file.close()
+        frames = read_video("../data/tmp/{}_src.mp4".format(wid))
+        h, w, _ = frames[0].shape
+        lm5 = pkl.load(BytesIO(lm5_bin))
+        lm68_list = pkl.load(BytesIO(lm68_bin))
+
+        # TODO: the following 4 lines need to be deleted once the collected lm68 is fixed
+        lm68 = []
+        for i in range(len(lm68_list)):
+            lm68.append(lm68_list[i][0])
+        lm68 = np.array(lm68)
+        lm3D = face_reconstructor.lm3D
+        lm68_align = align_lm68(lm5, lm68, lm3D, w, h)
+        lm68_align = lm68_align.astype(np.int32)
+        lm68_mouth_contour(lm68_align, "../data/tmp/{}_mouth.mp4".format(wid), tmp_dir)
+
+        coeff, align_img = face_reconstructor.recon_coeff(frames, lm5, return_image = True)
+
+        with open("../data/tmp/{}_coeff.pkl".format(wid), 'wb') as f:
+            pkl.dump(coeff, f)
+        with open("../data/tmp/{}_coeff_norm.pkl".format(wid), 'wb') as f:
+            coeff_norm = filter_norm_coeff(coeff)
+            pkl.dump(coeff_norm, f)
+        write_video(align_img, "../data/tmp/{}_align.mp4".format(wid), tmp_dir)
+        face_reconstructor.recon_uv_from_coeff(coeff, "../data/tmp/{}_uv.mp4".format(wid), tmp_dir, "../data/tmp/{}_bg.mp4".format(wid))
+        face_reconstructor.recon_texture_from_coeff(coeff, align_img, "../data/tmp/{}_texture.mp4".format(wid), tmp_dir)
+
+        with open("../data/tmp/{}_align.mp4".format(wid), 'rb') as f:
+            align_bin = f.read()
+        with open("../data/tmp/{}_uv.mp4".format(wid), 'rb') as f:
+            uv_bin = f.read()
+        with open("../data/tmp/{}_bg.mp4".format(wid), 'rb') as f:
+            bg_bin = f.read()
+        with open("../data/tmp/{}_texture.mp4".format(wid), 'rb') as f:
+            texture_bin = f.read()
+        with open("../data/tmp/{}_coeff.pkl".format(wid), 'rb') as f:
+            coeff_bin = f.read()
+        with open("../data/tmp/{}_coeff_norm.pkl".format(wid), 'rb') as f:
+            coeff_norm_bin = f.read()
+        with open("../data/tmp/{}_mouth.mp4".format(wid), 'rb') as f:
+            mouth_bin = f.read()
+            
+        txn = env.begin(write = True)
+        txn.put(str(data_name).encode(), align_bin, db = align_data)
+        txn.put(str(data_name).encode(), uv_bin, db = uv_data)
+        txn.put(str(data_name).encode(), bg_bin, db = bg_data)
+        txn.put(str(data_name).encode(), texture_bin, db = texture_data)
+        txn.put(str(data_name).encode(), coeff_bin, db = coeff_data)
+        txn.put(str(data_name).encode(), coeff_norm_bin, db = coeff_norm_data)
+        txn.put(str(data_name).encode(), mouth_bin, db = mouth_data)
+        txn.commit()
+
+def audio_worker(wid, data_list, train):
     pass
 
-def get_features(wnum = 8):
+def get_features_worker(wid, data_list, train):
+    audio_worker(wid, data_list, train)
+    recon3d_worker(wid, data_list, train)
+
+def get_features(train = True, num_worker = 8):
     '''
         For video:
             reconstruct 3d param
@@ -302,29 +403,49 @@ def get_features(wnum = 8):
             rgb texture
             uv map
             mouth region mask
-            eye gaussian heat map
-            need to filter pose of coeff (low pass filter)
+            background mask
         For audio:
             deepspeech feature
             energy feature
     '''
+
+    def assign_job(data_size, num_worker):
+        data_list = range(data_size)
+        data_chunk = np.array_split(np.array(data_list), num_worker)
+        return data_chunk
+
     lmdb_path = "../data/ted_hd/lmdb"
     env = lmdb.open(lmdb_path, map_size=1099511627776, max_dbs = 64)
-    train_video = env.open_db("train_video".encode())
-    test_video = env.open_db("test_video".encode())
+    if train:
+        video = env.open_db("train_video".encode())
+    else:
+        video = env.open_db("test_video".encode())
     
     with env.begin(write = False) as txn:
-        train_len = txn.stat(db=train_video)['entries']
-        test_len = txn.stat(db=test_video)['entries']
+        data_size = txn.stat(db=video)['entries']
+        data_chunk = assign_job(data_size, num_worker)
 
-    
+    w_list = []
+    for wid in range(num_worker):
+        w_list.append(Process(target = get_features_worker, args = (wid, data_chunk[wid], train)))
+
+    for wid in range(num_worker):
+        w_list[wid].start()
+        time.sleep(10)
+
+    for wid in range(num_worker):
+        w_list[wid].join()
+
+
+
 
 def main():
     # coarse_slice()
     # detect(4)
     # fine_slice()
     # split_train_test()
-    get_features()
+    get_features(train = True, num_worker = 1)
+    # get_features(train = False, num_worker = 4)
 
 def test():
     lmdb_path = "../data/ted_hd/lmdb"
@@ -356,10 +477,11 @@ def test():
     video_file.close()
     frames = read_video("test.mp4")
     reconstructor = deep_3drecon.Reconstructor()
-    # coeff, align_img = reconstructor.recon_coeff(frames, lm, return_image = True)
+    coeff, align_img = reconstructor.recon_coeff(frames, lm, return_image = True)
+    print(coeff.shape)
     # reconstructor.recon_uv_from_coeff(coeff, "test2.mp4")
     # reconstructor.recon_video_from_coeff_notex(coeff, "test2.mp4")
-    reconstructor.recon_texture(frames, lm, out_path = "test2.mp4")
+    # reconstructor.recon_texture(frames, lm, out_path = "test2.mp4")
     # print(coeff.shape, align_img.shape)
     # reconstructor.recon_video(frames, lm, out_path = "test2.mp4")
 
@@ -371,5 +493,5 @@ def test():
     
 
 if __name__ == "__main__":
-    # main()
-    test()
+    main()
+    # test()
