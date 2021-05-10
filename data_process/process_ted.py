@@ -12,6 +12,7 @@ import numpy as np
 import cv2
 import soundfile as sf
 import deep_3drecon
+import librosa
 from moviepy.editor import VideoFileClip
 from tqdm import tqdm
 from utils import lm68_2_lm5_batch, mean_eye_distance, read_video, write_video, filter_norm_coeff, lm68_mouth_contour
@@ -341,10 +342,10 @@ def recon3d_worker(wid, data_list, train):
         lm68_list = pkl.load(BytesIO(lm68_bin))
 
         # TODO: the following 4 lines need to be deleted once the collected lm68 is fixed
-        lm68 = []
-        for i in range(len(lm68_list)):
-            lm68.append(lm68_list[i][0])
-        lm68 = np.array(lm68)
+        # lm68 = []
+        # for i in range(len(lm68_list)):
+        #     lm68.append(lm68_list[i][0])
+        # lm68 = np.array(lm68)
         lm3D = face_reconstructor.lm3D
         lm68_align = align_lm68(lm5, lm68, lm3D, w, h)
         lm68_align = lm68_align.astype(np.int32)
@@ -387,7 +388,53 @@ def recon3d_worker(wid, data_list, train):
         txn.commit()
 
 def audio_worker(wid, data_list, train):
-    pass
+    import deepspeech
+    if wid == 0:
+        data_list = tqdm(data_list)
+
+    lmdb_path = "../data/ted_hd/lmdb"
+    env = lmdb.open(lmdb_path, map_size=1099511627776, max_dbs = 64)
+    if train:
+        audio_data = env.open_db("train_audio".encode())
+        deepspeech_data = env.open_db("train_deepspeech".encode())
+        energy_data = env.open_db("train_energy".encode())
+    else:
+        audio_data = env.open_db("test_audio".encode())
+        deepspeech_data = env.open_db("test_deepspeech".encode())
+        energy_data = env.open_db("test_energy".encode())
+
+    tmp_dir = "../data/tmp/{}".format(wid)
+    if not os.path.exists(tmp_dir):
+        os.makedirs(tmp_dir)
+    
+    os.environ["CUDA_VISIBLE_DEVICES"]=str(wid % 4)
+
+    for data_name in data_list:
+        txn = env.begin(write = False)
+        audio_bin = txn.get(str(data_name).encode(), db=audio_data)
+        txn.abort()
+
+        with open("../data/tmp/{}.wav".format(wid), 'wb') as f:
+            f.write(audio_bin)
+
+        deepspeech_prob = deepspeech.get_prob("../data/tmp/{}.wav".format(wid))
+        audio, sr = librosa.load("../data/tmp/{}.wav".format(wid), sr = 16000)
+        audio_energy = librosa.feature.rms(y = audio, frame_length = 512, hop_length = 320, center = False)
+
+        with open("../data/tmp/{}_deepspeech.pkl".format(wid), 'wb') as f:
+            pkl.dump(deepspeech_prob, f)
+        with open("../data/tmp/{}_energy.pkl".format(wid), 'wb') as f:
+            pkl.dump(audio_energy, f)
+
+        with open("../data/tmp/{}_deepspeech.pkl".format(wid), 'rb') as f:
+            deepspeech_bin = f.read()
+        with open("../data/tmp/{}_energy.pkl".format(wid), 'rb') as f:
+            energy_bin = f.read()
+
+        txn = env.begin(write = True)
+        txn.put(str(data_name).encode(), deepspeech_bin, db = deepspeech_data)
+        txn.put(str(data_name).encode(), energy_bin, db = energy_data)
+        txn.commit()
 
 def get_features_worker(wid, data_list, train):
     audio_worker(wid, data_list, train)
@@ -435,8 +482,6 @@ def get_features(train = True, num_worker = 8):
 
     for wid in range(num_worker):
         w_list[wid].join()
-
-
 
 
 def main():
