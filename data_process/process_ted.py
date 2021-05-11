@@ -343,7 +343,7 @@ def recon3d_worker(wid, data_list, train):
         lm68_list = pkl.load(BytesIO(lm68_bin))
 
         lm3D = face_reconstructor.lm3D
-        lm68_align = align_lm68(lm5, lm68, lm3D, w, h)
+        lm68_align = align_lm68(lm5, lm68_list, lm3D, w, h)
         lm68_align = lm68_align.astype(np.int32)
         lm68_mouth_contour(lm68_align, "../data/tmp/{}_mouth.mp4".format(wid), tmp_dir)
 
@@ -384,6 +384,7 @@ def recon3d_worker(wid, data_list, train):
         txn.commit()
 
 def audio_worker(wid, data_list, train):
+    os.environ["CUDA_VISIBLE_DEVICES"]=str(wid % 4)
     import deepspeech
     if wid == 0:
         data_list = tqdm(data_list)
@@ -403,7 +404,6 @@ def audio_worker(wid, data_list, train):
     if not os.path.exists(tmp_dir):
         os.makedirs(tmp_dir)
     
-    os.environ["CUDA_VISIBLE_DEVICES"]=str(wid % 4)
 
     for data_name in data_list:
         txn = env.begin(write = False)
@@ -482,11 +482,11 @@ def get_features(train = True, num_worker = 8):
 
 def main():
     # coarse_slice()
-    detect(4)
-    fine_slice()
-    split_train_test()
+    # detect(4)
+    # fine_slice()
+    # split_train_test()
     get_features(train = True, num_worker = 2)
-    get_features(train = False, num_worker = 4)
+    get_features(train = False, num_worker = 2)
 
 def test():
     lmdb_path = "../data/ted_hd/lmdb"
