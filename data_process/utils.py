@@ -19,7 +19,7 @@ def lm68_2_lm5(in_lm):
 def lm68_2_lm5_batch(in_lm_batch):
     lm5_list = []
     for i in range(len(in_lm_batch)):
-        lm = in_lm_batch[i][0]
+        lm = in_lm_batch[i]
         lm5 = lm68_2_lm5(lm)
         lm5_list.append(lm5)
 
