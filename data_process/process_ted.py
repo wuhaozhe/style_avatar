@@ -68,7 +68,7 @@ def detect_worker(wid, folder_list, src_video_path):
 
     os.environ["CUDA_VISIBLE_DEVICES"] = str(wid % 4)
     src_video_path = "../data/ted_hd/slice_video_coarse"
-    fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._3D, network_size=4, device='cuda')
+    fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D, network_size=4, device='cuda')
 
     if wid == 0:
         folder_list = tqdm(folder_list)
@@ -84,6 +84,7 @@ def detect_worker(wid, folder_list, src_video_path):
                 for image in vid.iter_data():
                     preds = fa.get_landmarks(image)
                     lm_list.append(preds)
+                lm_list = np.array(lm_list)[:, 0]
                 pkl.dump(lm_list, open(file_path[:-4] + "_lm.pkl", 'wb'))
 
     
@@ -341,11 +342,6 @@ def recon3d_worker(wid, data_list, train):
         lm5 = pkl.load(BytesIO(lm5_bin))
         lm68_list = pkl.load(BytesIO(lm68_bin))
 
-        # TODO: the following 4 lines need to be deleted once the collected lm68 is fixed
-        # lm68 = []
-        # for i in range(len(lm68_list)):
-        #     lm68.append(lm68_list[i][0])
-        # lm68 = np.array(lm68)
         lm3D = face_reconstructor.lm3D
         lm68_align = align_lm68(lm5, lm68, lm3D, w, h)
         lm68_align = lm68_align.astype(np.int32)
@@ -486,11 +482,11 @@ def get_features(train = True, num_worker = 8):
 
 def main():
     # coarse_slice()
-    # detect(4)
-    # fine_slice()
-    # split_train_test()
-    get_features(train = True, num_worker = 1)
-    # get_features(train = False, num_worker = 4)
+    detect(4)
+    fine_slice()
+    split_train_test()
+    get_features(train = True, num_worker = 2)
+    get_features(train = False, num_worker = 4)
 
 def test():
     lmdb_path = "../data/ted_hd/lmdb"
