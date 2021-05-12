@@ -318,6 +318,7 @@ def recon3d_worker(wid, data_list, train):
         uv_data = env.open_db("test_uv".encode())
         bg_data = env.open_db("test_bg".encode())
         texture_data = env.open_db("test_texture".encode())
+        coeff_data = env.open_db("test_coeff".encode())
         coeff_norm_data = env.open_db("test_coeff_norm".encode())
         mouth_data = env.open_db("test_mouth".encode())
 
@@ -484,7 +485,7 @@ def main():
     # coarse_slice()
     # detect(4)
     # fine_slice()
-    # split_train_test()
+    split_train_test()
     get_features(train = True, num_worker = 2)
     get_features(train = False, num_worker = 2)
 
