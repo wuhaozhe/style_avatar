@@ -208,7 +208,7 @@ class Reconstructor():
 
                     idx += self.batchsize
                     
-                os.system("rm {}".format(os.path.join(tmp_dir, "*.jpg")))
+                os.system("rm {}".format(os.path.join(tmp_dir, "*.png")))
 
                 for i in range(len(uv_array)):
                     tmp_uv_img = uv_array[i][::-1, :, :]
@@ -252,7 +252,7 @@ class Reconstructor():
 
                     idx += self.batchsize
 
-                os.system("rm {}".format(os.path.join(tmp_dir, "*.jpg")))
+                os.system("rm {}".format(os.path.join(tmp_dir, "*.png")))
 
                 for i in range(len(texture_array)):
                     tmp_texture_img = texture_array[i][::-1, :, :]
