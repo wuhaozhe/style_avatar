@@ -499,9 +499,10 @@ def test():
     test_video = env.open_db("test_video".encode())
     test_audio = env.open_db("test_audio".encode())
     test_lm5 = env.open_db("test_lm5".encode())
+    train_align_video = env.open_db("train_align".encode())
 
     with env.begin(write = False) as txn:
-        video = txn.get(str(0).encode(), db=test_video)
+        video = txn.get(str(0).encode(), db=train_align_video)
         lm = txn.get(str(0).encode(), db=test_lm5)
         audio = txn.get(str(0).encode(), db=test_audio)
         video_file = open("test.mp4", "wb")
@@ -510,17 +511,16 @@ def test():
         audio_file.write(audio)
         video_file.close()
         audio_file.close()
-        # print(txn.stat(db=train_video))
         # print(txn.stat(db=test_video))
     
-    lm = pkl.load(BytesIO(lm))
-    video_file = open("test.mp4", "wb")
-    video_file.write(video)
-    video_file.close()
-    frames = read_video("test.mp4")
-    reconstructor = deep_3drecon.Reconstructor()
-    coeff, align_img = reconstructor.recon_coeff(frames, lm, return_image = True)
-    print(coeff.shape)
+    # lm = pkl.load(BytesIO(lm))
+    # video_file = open("test.mp4", "wb")
+    # video_file.write(video)
+    # video_file.close()
+    # frames = read_video("test.mp4")
+    # reconstructor = deep_3drecon.Reconstructor()
+    # coeff, align_img = reconstructor.recon_coeff(frames, lm, return_image = True)
+    # print(coeff.shape)
     # reconstructor.recon_uv_from_coeff(coeff, "test2.mp4")
     # reconstructor.recon_video_from_coeff_notex(coeff, "test2.mp4")
     # reconstructor.recon_texture(frames, lm, out_path = "test2.mp4")
@@ -535,5 +535,5 @@ def test():
     
 
 if __name__ == "__main__":
-    main()
-    # test()
+    # main()
+    test()
