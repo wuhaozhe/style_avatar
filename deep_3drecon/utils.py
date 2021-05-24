@@ -60,7 +60,7 @@ class Reconstructor():
         self.bfm_dir = os.path.join(os.path.dirname(__file__), 'BFM')
         self.network_dir = os.path.join(os.path.dirname(__file__), 'network')
         self.lm3D = load_lm3d(self.bfm_dir)
-        self.batchsize = 128
+        self.batchsize = 32
         self.g = tf.Graph()
 
         with self.g.as_default() as graph,tf.device('/gpu:0'):
@@ -82,6 +82,8 @@ class Reconstructor():
             self.uv_img = FaceReconstructor.render_uvs
             self.recon_textures = FaceReconstructor.recon_textures
 
+        gpu_options = tf.GPUOptions(allow_growth = True)
+        self.sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options), graph = graph)
 
 
     def recon_coeff(self, frame_array, lm_array, return_image = False):
@@ -226,39 +228,37 @@ class Reconstructor():
         '''
             reconstruct texture from reconstructed coeff and aligned image
         '''
-        with self.g.as_default() as graph, tf.device('/gpu:0'):
-            with tf.Session() as sess:
-                if not os.path.exists(tmp_dir):
-                    os.makedirs(tmp_dir)
-                idx = 0
-                while idx < len(coeff_array):
-                    if idx + self.batchsize <= len(coeff_array):
-                        end_idx = self.batchsize
-                        coeff_batch = coeff_array[idx: idx + self.batchsize]
-                        img_batch = img_array[idx: idx + self.batchsize]
-                    else:
-                        # pad
-                        end_idx = len(coeff_array) - idx
-                        coeff_batch = pad_coeff(coeff_array[idx: ], self.batchsize)
-                        img_batch = pad_frame(img_array[idx: ], self.batchsize)
+        if not os.path.exists(tmp_dir):
+            os.makedirs(tmp_dir)
+        idx = 0
+        while idx < len(coeff_array):
+            if idx + self.batchsize <= len(coeff_array):
+                end_idx = self.batchsize
+                coeff_batch = coeff_array[idx: idx + self.batchsize]
+                img_batch = img_array[idx: idx + self.batchsize]
+            else:
+                # pad
+                end_idx = len(coeff_array) - idx
+                coeff_batch = pad_coeff(coeff_array[idx: ], self.batchsize)
+                img_batch = pad_frame(img_array[idx: ], self.batchsize)
 
-                    texture = sess.run([self.recon_textures], feed_dict = {self.coeff: coeff_batch, self.images: img_batch})
-                    texture = texture[0].astype(np.uint8)
+            texture = self.sess.run([self.recon_textures], feed_dict = {self.coeff: coeff_batch, self.images: img_batch})
+            texture = texture[0].astype(np.uint8)
 
-                    if idx == 0:
-                        texture_array = texture[:end_idx]
-                    else:
-                        texture_array = np.concatenate((texture_array, texture[:end_idx]), axis = 0)
+            if idx == 0:
+                texture_array = texture[:end_idx]
+            else:
+                texture_array = np.concatenate((texture_array, texture[:end_idx]), axis = 0)
 
-                    idx += self.batchsize
+            idx += self.batchsize
 
-                os.system("rm {}".format(os.path.join(tmp_dir, "*.png")))
+        os.system("rm {}".format(os.path.join(tmp_dir, "*.png")))
 
-                for i in range(len(texture_array)):
-                    tmp_texture_img = texture_array[i][::-1, :, :]
-                    cv2.imwrite("{}/{}.png".format(tmp_dir, i), tmp_texture_img)
+        for i in range(len(texture_array)):
+            tmp_texture_img = texture_array[i][::-1, :, :]
+            cv2.imwrite("{}/{}.png".format(tmp_dir, i), tmp_texture_img)
 
-                os.system("ffmpeg -loglevel warning -y -framerate 25 -start_number 0 -i {}/%d.png -c:v libx264 -pix_fmt yuv420p -b:v 1000k {}".format(tmp_dir, out_path))
+        os.system("ffmpeg -loglevel warning -y -framerate 25 -start_number 0 -i {}/%d.png -c:v libx264 -pix_fmt yuv420p -b:v 1000k {}".format(tmp_dir, out_path))
 
 
     def recon_texture(self, frame_array, lm_array, out_path = "test.mp4", tmp_dir = "./test"):
