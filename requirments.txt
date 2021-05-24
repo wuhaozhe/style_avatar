@@ -17,3 +17,4 @@ face-alignment==1.1.0
 torch>=1.2.0
 torchvision>=0.4.0
 tensorflow-addons>=0.12.1
+easydict>=1.9
