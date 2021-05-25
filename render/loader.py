@@ -88,6 +88,7 @@ class LRWTrainDataset(Dataset):
         uv_frames = uv_frames[:, :2]
         bg_frames = torch.from_numpy(bg_frames > 127).float()[:, :, :, 0].unsqueeze(1)
         texture_frames = torch.from_numpy(texture_frames).float().permute(0, 3, 1, 2) / 128 - 1
+        texture_frames = torch.flip(texture_frames, dims = [2])
         if self.require_appa:
             appa_bg = torch.from_numpy(appa_bg < 127).float()[:, :, 0].unsqueeze(0)
             appa_frames = torch.from_numpy(appa_frames).float().permute(2, 0, 1) / 128 - 1
@@ -162,6 +163,7 @@ class TedTestDataset(Dataset):
         bg_frames = torch.from_numpy(bg_frames > 127).float()[:, :, :, 0].unsqueeze(1)
         texture_frames = texture_frames[0: self.length]
         texture_frames = torch.from_numpy(texture_frames).float().permute(0, 3, 1, 2) / 128 - 1
+        texture_frames = torch.flip(texture_frames, dims = [2])
 
         return bg_frames, uv_frames, texture_frames
     

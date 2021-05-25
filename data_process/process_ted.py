@@ -499,7 +499,7 @@ def test():
     test_video = env.open_db("test_video".encode())
     test_audio = env.open_db("test_audio".encode())
     test_lm5 = env.open_db("test_lm5".encode())
-    train_align_video = env.open_db("train_align".encode())
+    train_align_video = env.open_db("test_align".encode())
 
     with env.begin(write = False) as txn:
         video = txn.get(str(0).encode(), db=train_align_video)

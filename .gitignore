@@ -12,3 +12,5 @@ deep_3drecon/test/
 data_process/test/
 audio2motion/log/
 audio2motion/model/
+render/log/
+render/model/

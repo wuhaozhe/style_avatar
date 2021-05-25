@@ -132,5 +132,5 @@ def test():
         video_file2.close()
 
 if __name__ == "__main__":
-    # gather_data(num_worker = 4)
-    test()
+    gather_data(num_worker = 4)
+    # test()
