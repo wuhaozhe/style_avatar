@@ -1,3 +1,8 @@
+from easydict import EasyDict as edict
+import argparse
+import numpy as np
+import torch
+
 def str2bool(v):
     # codes from : https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
 
@@ -13,18 +18,12 @@ def get_conf():
     parser.add_argument("--name", type=str, required = True)
     parser.add_argument("-it", "--iterations", help = "training iterations", default=200000, type=int)
     parser.add_argument("-b", "--batch_size", help="batch_size", default = 32, type=int)
-    parser.add_argument("-m", "--multi_gpu", help="use multi gpu", default=False, type=str2bool)
     parser.add_argument("-lp", "--load_path", help="path of model", default=None, type=str)
     parser.add_argument("-lr", "--lr", help="learning rate", default=1e-3, type=float)
-    parser.add_argument("-jp", "--json_path", help="config that written in json", default="./conf/ted_conf.json", type=str)
+    parser.add_argument("-m", "--mode", help="pose training or exp training", default="exp", type=str)
+    parser.add_argument("-d", "--drop", help="prob of dropout", default=0.5, type=float)
     conf = parser.parse_args()
-    conf.milestones = [25000]
     conf.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    if conf.load_path is None:
-        conf.load = False
-    else:
-        conf.load = True
-
     conf.model_path = "./model/{}".format(conf.name)
     conf.log_path = "./log/{}".format(conf.name)
     conf.test_path = "./test/{}".format(conf.name)

@@ -13,13 +13,14 @@ import quaternion
 from torch.utils.data import Dataset
 from io import BytesIO
 
-class TedMultiDataset(Dataset):
-    def __init__(self, fx, fy, x_win, y_win, train = True):
+class TedDataset(Dataset):
+    def __init__(self, fx, fy, x_win, y_win, train = True, step = 8):
         self.fx = fx
         self.fy = fy
         self.y_win = y_win
         self.x_win = x_win
         self.train = train
+        self.step = step    # the test step
         if train:
             self.db_key = "train"
         else:
@@ -109,7 +110,7 @@ class TedMultiDataset(Dataset):
         pose_clip_list = []
         exp_clip_list = []
 
-        for i in range(0, y_len, 8):    # by default, the stride of test data is 8
+        for i in range(0, y_len, self.step):
             if i > y_len - self.y_win:
                 y_left = y_len - self.y_win
                 y_right = y_len
@@ -175,8 +176,8 @@ class TedMultiDataset(Dataset):
             return self.__get_test_data(idx)
 
 if __name__ == "__main__":
-    train_data = TedMultiDataset(50, 25, 80, 32, True)
-    test_data = TedMultiDataset(50, 25, 80, 32, False)
+    train_data = TedDataset(50, 25, 80, 32, True)
+    test_data = TedDataset(50, 25, 80, 32, False)
     from tqdm import tqdm
     for i in tqdm(range(100)):
         exp_clip, pose_clip, audio_clip, energy_clip, x_sty = train_data.__getitem__(i)
