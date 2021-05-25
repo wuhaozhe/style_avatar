@@ -10,3 +10,5 @@ deep_3drecon/BFM/
 deep_3drecon/network/
 deep_3drecon/test/
 data_process/test/
+audio2motion/log/
+audio2motion/model/
