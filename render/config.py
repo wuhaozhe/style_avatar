@@ -1,6 +1,4 @@
 # =============== Basic Configurations ===========
-TEXTURE_W = 128
-TEXTURE_H = 128
 TEXTURE_DIM = 16
 
 
