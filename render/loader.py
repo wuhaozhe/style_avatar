@@ -10,14 +10,12 @@ import lmdb
 random.seed(time.time())
 from torch.utils.data import Dataset
 
-
-class LRWTrainDataset(Dataset):
-    def __init__(self, length = 8, require_appa = False):
+class LRWDataset(Dataset):
+    def __init__(self, require_appa = False):
         # the worker id and rand flag are used when read video from lmdb
         self.worker_id = None
         self.rand_flag = random.randint(0, 4096)
 
-        self.length = length
         self.require_appa = require_appa
         lmdb_path = "../data/lrw/lmdb"
         self.env = lmdb.open(lmdb_path, map_size=1099511627776, max_dbs = 64)
@@ -41,7 +39,7 @@ class LRWTrainDataset(Dataset):
             frame_list.append(frame)
         return frame_list
 
-    def __get_data_from_db(self, idx):
+    def get_data_from_db(self, idx):
         align_bin = self.txn.get(str(idx).encode(), db = self.align_data)
         uv_bin = self.txn.get(str(idx).encode(), db = self.uv_data)
         bg_bin = self.txn.get(str(idx).encode(), db = self.bg_data)
@@ -70,9 +68,21 @@ class LRWTrainDataset(Dataset):
         texture_frames = np.array(self.__getvideo__(texture_path))
         return align_frames, uv_frames, bg_frames, texture_frames
 
+    def __getitem__(self, idx):
+        raise Exception("method should be implemented in sub classes")
+
+class LRWTrainDataset(LRWDataset):
+    def __init__(self, length = 8, require_appa = False):
+        # the worker id and rand flag are used when read video from lmdb
+        LRWDataset.__init__(self, require_appa)
+        self.length = length
+
+    def __len__(self):
+        return self.data_size
+
     # getitem中 tex frame与apparel frames是前length个，uv, vid与bg是后面随机
     def __getitem__(self, idx):
-        align_frames, uv_frames, bg_frames, texture_frames = self.__get_data_from_db(idx)
+        align_frames, uv_frames, bg_frames, texture_frames = self.get_data_from_db(idx)
 
         texture_frames = texture_frames[0: self.length]
         appa_frames = align_frames[0]
@@ -83,6 +93,34 @@ class LRWTrainDataset(Dataset):
         uv_frames = uv_frames[rand_start: rand_start + self.length]
         align_frames = align_frames[rand_start: rand_start + self.length]
         
+        align_frames = torch.from_numpy(align_frames).float().permute(0, 3, 1, 2) / 128 - 1
+        uv_frames = torch.from_numpy(uv_frames).float().permute(0, 3, 1, 2) / 255
+        uv_frames = uv_frames[:, :2]
+        bg_frames = torch.from_numpy(bg_frames > 127).float()[:, :, :, 0].unsqueeze(1)
+        texture_frames = torch.from_numpy(texture_frames).float().permute(0, 3, 1, 2) / 128 - 1
+        texture_frames = torch.flip(texture_frames, dims = [2])
+        if self.require_appa:
+            appa_bg = torch.from_numpy(appa_bg < 127).float()[:, :, 0].unsqueeze(0)
+            appa_frames = torch.from_numpy(appa_frames).float().permute(2, 0, 1) / 128 - 1
+            appa_frames = appa_frames * appa_bg
+            return bg_frames, uv_frames, align_frames, texture_frames, appa_frames
+        else:
+            return bg_frames, uv_frames, align_frames, texture_frames
+
+class LRWTestDataset(LRWDataset):
+    def __init__(self, require_appa = False):
+        LRWDataset.__init__(self, require_appa)
+
+    def __len__(self):
+        return self.data_size
+
+    def __getitem__(self, idx):
+        align_frames, uv_frames, bg_frames, texture_frames = self.get_data_from_db(idx)
+
+        texture_frames = texture_frames[0: 1]
+        appa_frames = align_frames[0]
+        appa_bg = bg_frames[0]
+
         align_frames = torch.from_numpy(align_frames).float().permute(0, 3, 1, 2) / 128 - 1
         uv_frames = torch.from_numpy(uv_frames).float().permute(0, 3, 1, 2) / 255
         uv_frames = uv_frames[:, :2]
@@ -171,6 +209,10 @@ class TedTestDataset(Dataset):
 if __name__ == "__main__":
     train_data = LRWTrainDataset(length = 3, require_appa = True)
     bg_frames, uv_frames, vid_frames, tex_frames, appa_frames = train_data.__getitem__(0)
+    print(bg_frames.shape, uv_frames.shape, vid_frames.shape, tex_frames.shape, appa_frames.shape)
+
+    test_data = LRWTestDataset(require_appa = True)
+    bg_frames, uv_frames, vid_frames, tex_frames, appa_frames = test_data.__getitem__(0)
     print(bg_frames.shape, uv_frames.shape, vid_frames.shape, tex_frames.shape, appa_frames.shape)
 
     test_data = TedTestDataset(length = 3)

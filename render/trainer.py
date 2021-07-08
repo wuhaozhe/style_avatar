@@ -105,6 +105,16 @@ class RenderTrainerAdv(object):
         print(self.optimizer_D)
         print(self.optimizer_G)
 
+    def infer_trainset(self):
+        self.tex_encoder.eval()
+        self.tex_sampler.eval()
+        self.face_unet.eval()
+
+        batch_size = 32
+
+        with torch.no_grad():
+            
+
     def test(self):
         self.tex_encoder.eval()
         self.tex_sampler.eval()
