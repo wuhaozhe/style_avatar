@@ -1,1 +1,1 @@
-python main.py --name render_lrw_lr_2e-4_vggsingle --lr 2e-4 --it 1000000 --batch 6
+python main.py --name render_lrw_lr_2e-4_vggsingle --lr 2e-4 --it 1000000 --batch 6 -tl 3

@@ -1,12 +1,12 @@
 import sys
 sys.path.append("..")
-from loader import TedDataset
+from .loader import TedDataset
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from tensorboardX import SummaryWriter
 from torch import optim
-from model import StyleFusionModel
-from utils import mkdirs
+from .model import StyleFusionModel
+from .utils import mkdirs
 import json
 import numpy as np
 import torch
@@ -73,6 +73,7 @@ class Trainer(object):
             lr = conf.lr,
             weight_decay = 1e-4
         )
+        # self.load_state(self.backbone, "/home/wuhz/mnt/avatar/fouriermap/model/arbsty_drop_0.5_exp/backbone.pkl")
 
     def save_state(self, model, save_path):
         torch.save(model.state_dict(), save_path)
