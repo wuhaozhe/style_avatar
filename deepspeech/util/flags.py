@@ -157,6 +157,7 @@ def create_flags():
     # Decoder
 
     f.DEFINE_boolean('bytes_output_mode', False, 'enable Bytes Output Mode mode. When this is used the model outputs UTF-8 byte values directly rather than using an alphabet mapping. The --alphabet_config_path option will be ignored. See the training documentation for more details.')
+    # f.DEFINE_boolean('bytes_output_mode', True, 'enable Bytes Output Mode mode. When this is used the model outputs UTF-8 byte values directly rather than using an alphabet mapping. The --alphabet_config_path option will be ignored. See the training documentation for more details.')
     f.DEFINE_string('scorer_path', '', 'path to the external scorer file.')
     f.DEFINE_alias('scorer', 'scorer_path')
     f.DEFINE_integer('beam_width', 1024, 'beam width used in the CTC decoder when building candidate transcriptions')

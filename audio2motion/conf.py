@@ -15,7 +15,7 @@ def str2bool(v):
 
 def get_conf():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--name", type=str, required = True)
+    parser.add_argument("--name", type=str, default="test")
     parser.add_argument("-it", "--iterations", help = "training iterations", default=200000, type=int)
     parser.add_argument("-b", "--batch_size", help="batch_size", default = 32, type=int)
     parser.add_argument("-lp", "--load_path", help="path of model", default=None, type=str)

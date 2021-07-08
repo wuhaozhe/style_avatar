@@ -79,6 +79,10 @@ class RenderTrainerAdv(object):
         print(self.optimizer_G)
         print(self.optimizer_D)
 
+        # self.load_state(self.face_unet, "/home/wuhz/mnt/avatar/NeuralRender/model/render_lrw_lr_2e-4_vggsingle/face_unet.pkl")
+        # self.load_state(self.tex_sampler, "/home/wuhz/mnt/avatar/NeuralRender/model/render_lrw_lr_2e-4_vggsingle/tex_sampler.pkl")
+        # self.load_state(self.tex_encoder, "/home/wuhz/mnt/avatar/NeuralRender/model/render_lrw_lr_2e-4_vggsingle/tex_encoder.pkl")
+
     def save_state(self, model, save_path):
         if self.multi_gpu:
             torch.save(model.module.state_dict(), save_path)
@@ -139,8 +143,8 @@ class RenderTrainerAdv(object):
 
                 os.system("rm ../data/tmp/test/*")
                 for i in range(len(pred_img_batch)):
-                    torchvision.utils.save_image(pred_img_batch[i], "../data/tmp/test/{}.png".format(i), normalize = True, range = (-1, 1))
-                os.system("ffmpeg -loglevel warning -framerate 25 -start_number 0 -i ../data/tmp/test/%d.png -c:v libx264 -pix_fmt yuv420p -b:v 2000k ./test.mp4")
+                    torchvision.utils.save_image(pred_img_batch[i], "../data/tmp/test/{}_{}.png".format(i, self.name), normalize = True, range = (-1, 1))
+                os.system("ffmpeg -y -loglevel warning -framerate 25 -start_number 0 -i ../data/tmp/test/%d_{}.png -c:v libx264 -pix_fmt yuv420p -b:v 2000k ./test_{}.mp4".format(self.name, self.name))
 
         self.tex_encoder.train()
         self.tex_sampler.train()

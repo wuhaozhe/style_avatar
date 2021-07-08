@@ -223,6 +223,7 @@ class Reconstructor():
                 if not (bg_path is None):
                     os.system("ffmpeg -loglevel warning -y -framerate 25 -start_number 0 -i {}/%d_bg.png -c:v libx264 -pix_fmt yuv420p -b:v 1000k {}".format(tmp_dir, bg_path))
 
+
     # given uv img array and img array, generate texture image
     def recon_texture_from_coeff(self, coeff_array, img_array, out_path = "test.mp4", tmp_dir = "./test"):
         '''
