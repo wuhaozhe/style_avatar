@@ -7,6 +7,8 @@ deepspeech/deepspeech-0.9.2-checkpoint-zh-CN/
 **/*.m4a
 **/*.mp4
 **/*.avi
+**/*.pkl
+**/*.dat
 data/
 deep_3drecon/BFM/
 deep_3drecon/network/
@@ -16,7 +18,18 @@ audio2motion/log/
 audio2motion/model/
 render/log/
 render/model/
+render/tune_log/
+render/tune_model/
+render/nvp_log/
+render/nvp_model/
+render/notune_model/
+render/notune_log/
+render/ted_model/
+render/ted_log/
+render/ted_model/
+render/ted/
 huazhibing/
 huazhibing.py
 test/
+visualize/
 matting/*.ckpt

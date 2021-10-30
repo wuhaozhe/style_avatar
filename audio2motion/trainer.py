@@ -1,12 +1,15 @@
 import sys
 sys.path.append("..")
-from .loader import TedDataset
+# from .loader import TedDataset
+from loader import TedDataset
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from tensorboardX import SummaryWriter
 from torch import optim
-from .model import StyleFusionModel
-from .utils import mkdirs
+# from .model import StyleFusionModel
+# from .utils import mkdirs
+from model import StyleFusionModel
+from utils import mkdirs
 import json
 import numpy as np
 import torch
@@ -73,13 +76,49 @@ class Trainer(object):
             lr = conf.lr,
             weight_decay = 1e-4
         )
-        # self.load_state(self.backbone, "/home/wuhz/mnt/avatar/fouriermap/model/arbsty_drop_0.5_exp/backbone.pkl")
+        self.load_state(self.backbone, "/home/wuhz/mnt/avatar/fouriermap/model/arbsty_drop_0.5_exp/backbone.pkl")
 
     def save_state(self, model, save_path):
         torch.save(model.state_dict(), save_path)
 
     def load_state(self, model, model_path, strict = True):
         model.load_state_dict(torch.load(model_path), strict = strict)
+
+    def test_all(self):
+        trainloader_iter = iter(self.trainloader)
+        _, _, _, _, sty = next(trainloader_iter)
+        sty = sty.to(self.device)
+        sty = sty[0:10]
+
+        # self.backbone.eval()
+        self.backbone.train()
+        coeff = np.load("../data/ted_hd/test_coeff.npy")
+        for idx in range(len(self.testset)):
+            exp_batch, pose_batch, audio_batch, ene_batch, y_len = self.testset.__getitem__(idx)
+            exp_batch, pose_batch, audio_batch, ene_batch = exp_batch.to(self.device), pose_batch.to(self.device), audio_batch.to(self.device), ene_batch.to(self.device)
+            coeff = np.repeat(np.expand_dims(coeff[0], axis = 0), y_len, axis = 0)
+
+            for j in range(10):
+                sty_tmp = sty[j].unsqueeze(0).repeat(len(exp_batch), 1)
+                pred_exp_batch = self.backbone(audio_batch, ene_batch, sty_tmp)
+
+                y_repeat = torch.zeros(y_len).int().to(self.device)
+                predict_exp_cat = torch.zeros((y_len, self.out_dim)).float().to(self.device)
+                for counter, i in enumerate(range(0, y_len, 8)):
+                    if i > y_len - self.ywin:
+                        y_left = y_len - self.ywin
+                        y_right = y_len
+                    else:
+                        y_left = i
+                        y_right = i + self.ywin
+                    y_repeat[y_left: y_right] += 1
+                    predict_exp_cat[y_left: y_right] += pred_exp_batch[counter].transpose(0, 1)
+                y_repeat = y_repeat.float()
+                predict_exp_cat = predict_exp_cat / y_repeat.unsqueeze(1)
+                coeff[:, 80:144] = predict_exp_cat.detach().cpu().numpy()
+                np.save("../data/ted_hd/test/{}_{}.npy".format(idx, j), coeff)
+
+        self.backbone.train()
 
     def test(self, sty = None):
         # Given light, shape of test coeff, synthesize video

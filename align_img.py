@@ -72,6 +72,35 @@ def align(img, lm, lm3D):
 
 	return img_new,lm_new,trans_params
 
+def align_video(img_array, lm_array, lm3D):
+	t_list = []
+	s_list = []
+	w0,h0 = Image.fromarray(img_array[0]).size
+	for i in range(len(lm_array)):
+		lm = lm_array[i]
+		lm = np.stack([lm[:,0],h0 - 1 - lm[:,1]], axis = 1)
+		t,s = POS(lm.transpose(),lm3D.transpose())
+		t_list.append(t)
+		s_list.append(s)
+
+	s = np.mean(np.array(s_list))
+
+	img_list = []
+	lm_new_list = []
+	trans_list = []
+	for i in range(len(img_array)):
+		t = t_list[i]
+		img = img_array[i][:,:,::-1]
+		img = Image.fromarray(img)
+		img_new, lm_new = process_img(img, lm_array[i], t_list[i], s)
+		lm_new = np.stack([lm_new[:,0],223 - lm_new[:,1]], axis = 1)
+		trans_params = np.array([w0,h0,102.0/s,t[0],t[1]])
+		img_list.append(img_new[0])
+		lm_new_list.append(lm_new)
+		trans_list.append(trans_params)
+
+	return np.array(img_list), np.array(lm_new_list), np.array(trans_list)
+
 
 def align_lm68(lm5_list, lm68_list, lm3D, w0, h0, target_size = 224.):
 	'''

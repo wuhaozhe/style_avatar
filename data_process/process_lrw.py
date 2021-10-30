@@ -112,7 +112,8 @@ def test():
     lmdb_path = "../data/lrw/lmdb"
     env = lmdb.open(lmdb_path, map_size=1099511627776, max_dbs = 64)
 
-    align_data = env.open_db("align".encode())
+    # align_data = env.open_db("align".encode())
+    align_data = env.open_db("pred_data".encode())
     lm5_data = env.open_db("lm5".encode())
     lm68_data = env.open_db("lm68".encode())
     uv_data = env.open_db("uv".encode())
@@ -122,9 +123,11 @@ def test():
     mouth_data = env.open_db("mouth".encode())
 
     with env.begin(write = False) as txn:
-        video1 = txn.get(str(0).encode(), db=align_data)
+        print(txn.stat(db=align_data))
+        video1 = txn.get(str(5).encode(), db=align_data)
         video2 = txn.get(str(0).encode(), db=texture_data)
-        video_file1 = open("test.mp4", "wb")
+        # video_file1 = open("test.mp4", "wb")
+        video_file1 = open("test.avi", "wb")
         video_file2 = open("test2.mp4", "wb")
         video_file1.write(video1)
         video_file2.write(video2)
@@ -132,5 +135,5 @@ def test():
         video_file2.close()
 
 if __name__ == "__main__":
-    gather_data(num_worker = 4)
-    # test()
+    # gather_data(num_worker = 4)
+    test()
