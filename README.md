@@ -1,5 +1,6 @@
 # style_avatar
-A repository for generating stylized talking 3D and 3D face
+A repository for generating stylized talking 3D and 3D face. 
+This is the repository for paper *Imitating Arbitrary Talking Style for Realistic Audio-Driven Talking Face Synthesis, MM 2021*
 
 **we are still clearing up the code, a full version of code will be released soon**
 ------
@@ -71,3 +72,16 @@ We implement several batch-wise api in `deep_3drecon/utils.py`, including UV ima
 
 
 Notice that the function `recon_texture` generates texture through aligning input image and 3D model, rather than generating texture from 3DMM space.
+
+------
+### Citation
+
+```
+@inproceedings{wu2021imitating,
+  title={Imitating Arbitrary Talking Style for Realistic Audio-Driven Talking Face Synthesis},
+  author={Wu, Haozhe and Jia, Jia and Wang, Haoyu and Dou, Yishun and Duan, Chao and Deng, Qingshan},
+  booktitle={Proceedings of the 29th ACM International Conference on Multimedia},
+  pages={1478--1486},
+  year={2021}
+}
+```
