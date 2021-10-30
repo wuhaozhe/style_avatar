@@ -178,6 +178,7 @@ class TedDataset(Dataset):
 if __name__ == "__main__":
     train_data = TedDataset(50, 25, 80, 32, True)
     test_data = TedDataset(50, 25, 80, 32, False)
+    print(len(train_data), len(test_data))
     from tqdm import tqdm
     for i in tqdm(range(100)):
         exp_clip, pose_clip, audio_clip, energy_clip, x_sty = train_data.__getitem__(i)

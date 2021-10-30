@@ -65,6 +65,22 @@ def filter_norm_coeff(coeff_array):
     coeff_array_copy[:, 254:257] = translation_normed
     return coeff_array_copy
 
+def filter_coeff(coeff_array):
+    coeff_array_copy = np.copy(coeff_array)
+    angles = coeff_array[:, 224:227] # euler angles for pose, order(x y z)
+    translation = coeff_array[:, 254:257] # translation
+    angle_filter = filter_batch(angles, 0.7)
+    translation_filter = filter_batch(translation, 0.7)
+
+    coeff_array_copy[:, 224:227] = angle_filter
+    coeff_array_copy[:, 254:257] = translation_filter
+    return coeff_array_copy
+
+def filter_lm5(lm_array):
+    lm_flat = lm_array.reshape(lm_array.shape[0], -1)
+    lm_filtered = filter_batch(lm_flat, 0.5)
+    lm_filtered = lm_filtered.reshape(lm_array.shape[0], -1, 2)
+    return lm_filtered
 
 # Take euler array as input, output normalized quaternion
 # the average of quaternion is normalized to I

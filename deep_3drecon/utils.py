@@ -7,7 +7,7 @@ import os
 import time
 from scipy.io import loadmat,savemat
 from tqdm import tqdm
-from align_img import align
+from align_img import align, align_video
 from .face_decoder import Face3D
 
 def load_graph(graph_filename):
@@ -89,24 +89,25 @@ class Reconstructor():
     def recon_coeff(self, frame_array, lm_array, return_image = False):
         with self.g.as_default() as graph, tf.device('/gpu:0'):
             with tf.Session() as sess:
+                input_img_list, _, _ = align_video(frame_array, lm_array, self.lm3D)
                 idx = 0
                 while idx < len(frame_array):
                     if idx + self.batchsize <= len(frame_array):
                         end_idx = self.batchsize
-                        frame_batch = frame_array[idx: idx + self.batchsize]
-                        lm_batch = lm_array[idx: idx + self.batchsize]
+                        input_img_array = input_img_list[idx: idx + self.batchsize]
+                        # lm_batch = lm_array[idx: idx + self.batchsize]
                     else:
                         # pad
                         end_idx = len(frame_array) - idx
-                        frame_batch = pad_frame(frame_array[idx: ], self.batchsize)
-                        lm_batch = pad_lm(lm_array[idx: ], self.batchsize)
+                        input_img_array = pad_frame(input_img_list[idx: ], self.batchsize)
+                        # lm_batch = pad_lm(lm_array[idx: ], self.batchsize)
 
-                    input_img_list = []
-                    for i in range(self.batchsize):
-                        input_img,lm_new,transform_params = align(frame_batch[i],lm_batch[i],self.lm3D)
-                        input_img_list.append(input_img)
+                    # input_img_list = []
+                    # for i in range(self.batchsize):
+                    #     input_img,lm_new,transform_params = align(frame_batch[i],lm_batch[i],self.lm3D)
+                    #     input_img_list.append(input_img)
                     
-                    input_img_array = np.concatenate(input_img_list, axis = 0)
+                    # input_img_array = np.concatenate(input_img_list, axis = 0)
                     coeff_ = sess.run([self.coeff],feed_dict = {self.images: input_img_array})
                     coeff_ = coeff_[0]
                     

@@ -7,6 +7,20 @@ from torch.nn import init
 from torch.autograd import Variable
 from torchvision import models
 
+class BgErode(nn.Module):
+    def __init__(self):
+        super(BgErode, self).__init__()
+        self.pool = nn.MaxPool2d(19, stride = 1, padding = 9)
+
+    def forward(self, x):
+        x = x.clone()
+        x_lower = x[:, :, 168:, :]
+        x_lower = -1 * x_lower
+        x_lower = self.pool(x_lower)
+        x_lower = -1 * x_lower
+        x[:, :, 168:, :] = x_lower
+        return x
+
 class down(nn.Module):
     def __init__(self, in_ch, out_ch, first = False):
         super(down, self).__init__()
@@ -96,6 +110,35 @@ class UNet(nn.Module):
         x = nn.functional.tanh(x)
         return x
 
+# Unet without pooling
+class UNetnop(nn.Module):
+    def __init__(self, input_channels, output_channels):
+        super(UNetnop, self).__init__()
+        self.down1 = down(input_channels, 64, first = True)
+        self.down2 = down(64, 128)
+        self.down3 = down(128, 256)
+        self.down4 = down(256, 512)
+        self.down5 = down(512, 512)
+        self.up1 = up(512, 512, output_pad=1, concat=False)
+        self.up2 = up(1024, 512)
+        self.up3 = up(768, 256)
+        self.up4 = up(384, 128)
+        self.up5 = up(128, output_channels, final=True, concat = False)
+
+    def forward(self, x):
+        x1 = self.down1(x)
+        x2 = self.down2(x1)
+        x3 = self.down3(x2)
+        x4 = self.down4(x3)
+        x5 = self.down5(x4)
+        x = self.up1(x5, None)
+        x = self.up2(x, x4)
+        x = self.up3(x, x3)
+        x = self.up4(x, x2)
+        x = self.up5(x, x1)
+        x = nn.functional.tanh(x)
+        return x
+
 class TexSampler(nn.Module):
     def __init__(self):
         super(TexSampler, self).__init__()
@@ -122,6 +165,9 @@ def define_G(input_nc, output_nc, ngf, netG, n_downsample_global=3, n_blocks_glo
         netG = GlobalGenerator(input_nc, output_nc, ngf, n_downsample_global, n_blocks_global, norm_layer)       
     elif netG == 'local':        
         netG = LocalEnhancer(input_nc, output_nc, ngf, n_downsample_global, n_blocks_global, 
+                                  n_local_enhancers, n_blocks_local, norm_layer)
+    elif netG == 'local2':
+        netG = LocalEnhancer2(3, 3, output_nc, ngf, n_downsample_global, n_blocks_global, 
                                   n_local_enhancers, n_blocks_local, norm_layer)
     elif netG == 'encoder':
         netG = Encoder(input_nc, output_nc, ngf, n_downsample_global, norm_layer)
@@ -266,6 +312,68 @@ class LocalEnhancer(nn.Module):
         input_downsampled = [input]
         for i in range(self.n_local_enhancers):
             input_downsampled.append(self.downsample(input_downsampled[-1]))
+
+        ### output at coarest level
+        output_prev = self.model(input_downsampled[-1])        
+        ### build up one layer at a time
+        for n_local_enhancers in range(1, self.n_local_enhancers+1):
+            model_downsample = getattr(self, 'model'+str(n_local_enhancers)+'_1')
+            model_upsample = getattr(self, 'model'+str(n_local_enhancers)+'_2')            
+            input_i = input_downsampled[self.n_local_enhancers-n_local_enhancers]            
+            output_prev = model_upsample(model_downsample(input_i) + output_prev)
+        return output_prev
+
+class LocalEnhancer2(nn.Module):
+    def __init__(self, input_nc1, input_nc2, output_nc, ngf=32, n_downsample_global=3, n_blocks_global=9, 
+                 n_local_enhancers=1, n_blocks_local=3, norm_layer=nn.BatchNorm2d, padding_type='reflect'):        
+        super(LocalEnhancer2, self).__init__()
+        self.n_local_enhancers = n_local_enhancers
+        
+        ###### global generator model #####           
+        ngf_global = ngf * (2**n_local_enhancers)
+        model_global = GlobalGenerator(input_nc1 + input_nc2, output_nc, ngf_global, n_downsample_global, n_blocks_global, norm_layer).model        
+        model_global = [model_global[i] for i in range(len(model_global)-3)] # get rid of final convolution layers        
+        self.model = nn.Sequential(*model_global)                
+
+        ###### local enhancer layers #####
+        for n in range(1, n_local_enhancers+1):
+            ### downsample            
+            ngf_global = ngf * (2**(n_local_enhancers-n))
+            model_downsample = [nn.ReflectionPad2d(3), nn.Conv2d(input_nc2, ngf_global, kernel_size=7, padding=0), 
+                                norm_layer(ngf_global), nn.ReLU(True),
+                                nn.Conv2d(ngf_global, ngf_global * 2, kernel_size=3, stride=2, padding=1), 
+                                norm_layer(ngf_global * 2), nn.ReLU(True)]
+            ### residual blocks
+            model_upsample = []
+            for i in range(n_blocks_local):
+                model_upsample += [ResnetBlock(ngf_global * 2, padding_type=padding_type, norm_layer=norm_layer)]
+
+            ### upsample
+            # model_upsample += [nn.ConvTranspose2d(ngf_global * 2, ngf_global, kernel_size=3, stride=2, padding=1, output_padding=1), 
+            #                    norm_layer(ngf_global), nn.ReLU(True)]      
+
+            ### upsample to prevent checkerboard effect
+            model_upsample += [
+                                nn.Upsample(scale_factor = 2, mode='nearest'),
+                                nn.ReflectionPad2d(1),
+                                nn.Conv2d(ngf_global * 2, ngf_global, kernel_size=3, stride=1, padding=0),
+                                norm_layer(ngf_global), nn.ReLU(True)
+                            ]
+
+            ### final convolution
+            if n == n_local_enhancers:                
+                model_upsample += [nn.ReflectionPad2d(3), nn.Conv2d(ngf, output_nc, kernel_size=7, padding=0), nn.Tanh()]                       
+            
+            setattr(self, 'model'+str(n)+'_1', nn.Sequential(*model_downsample))
+            setattr(self, 'model'+str(n)+'_2', nn.Sequential(*model_upsample))                  
+        
+        self.downsample = nn.AvgPool2d(3, stride=2, padding=[1, 1], count_include_pad=False)
+
+    def forward(self, input): 
+        ### create input pyramid
+        input_downsampled = [input[:, 3:]]
+        for i in range(self.n_local_enhancers):
+            input_downsampled.append(self.downsample(input))
 
         ### output at coarest level
         output_prev = self.model(input_downsampled[-1])        
@@ -517,6 +625,57 @@ class Vgg19(torch.nn.Module):
         h_relu5 = self.slice5(h_relu4)                
         out = [h_relu1, h_relu2, h_relu3, h_relu4, h_relu5]
         return out
+
+def gauss_kernel(size=5, device=torch.device('cpu'), channels=3):
+    kernel = torch.tensor([[1., 4., 6., 4., 1],
+                           [4., 16., 24., 16., 4.],
+                           [6., 24., 36., 24., 6.],
+                           [4., 16., 24., 16., 4.],
+                           [1., 4., 6., 4., 1.]])
+    kernel /= 256.
+    kernel = kernel.repeat(channels, 1, 1, 1)
+    kernel = kernel.to(device)
+    return kernel
+
+def downsample(x):
+    return x[:, :, ::2, ::2]
+
+def upsample(x):
+    cc = torch.cat([x, torch.zeros(x.shape[0], x.shape[1], x.shape[2], x.shape[3], device=x.device)], dim=3)
+    cc = cc.view(x.shape[0], x.shape[1], x.shape[2]*2, x.shape[3])
+    cc = cc.permute(0,1,3,2)
+    cc = torch.cat([cc, torch.zeros(x.shape[0], x.shape[1], x.shape[3], x.shape[2]*2, device=x.device)], dim=3)
+    cc = cc.view(x.shape[0], x.shape[1], x.shape[3]*2, x.shape[2]*2)
+    x_up = cc.permute(0,1,3,2)
+    return conv_gauss(x_up, 4*gauss_kernel(channels=x.shape[1], device=x.device))
+
+def conv_gauss(img, kernel):
+    img = torch.nn.functional.pad(img, (2, 2, 2, 2), mode='reflect')
+    out = torch.nn.functional.conv2d(img, kernel, groups=img.shape[1])
+    return out
+
+def laplacian_pyramid(img, kernel, max_levels=3):
+    current = img
+    pyr = []
+    for level in range(max_levels):
+        filtered = conv_gauss(current, kernel)
+        down = downsample(filtered)
+        up = upsample(down)
+        diff = current-up
+        pyr.append(diff)
+        current = down
+    return pyr
+
+class LapLoss(torch.nn.Module):
+    def __init__(self, max_levels=3, channels=3, device=torch.device('cpu')):
+        super(LapLoss, self).__init__()
+        self.max_levels = max_levels
+        self.gauss_kernel = gauss_kernel(channels=channels, device=device)
+        
+    def forward(self, input, target):
+        pyr_input  = laplacian_pyramid(img=input, kernel=self.gauss_kernel, max_levels=self.max_levels)
+        pyr_target = laplacian_pyramid(img=target, kernel=self.gauss_kernel, max_levels=self.max_levels)
+        return sum(torch.nn.functional.l1_loss(a, b) for a, b in zip(pyr_input, pyr_target))
 
 def init_weights(net, init_type='normal', init_gain=0.02):
     """Initialize network weights.
