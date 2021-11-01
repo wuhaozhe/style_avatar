@@ -1,44 +1,87 @@
 # style_avatar
-A repository for generating stylized talking 3D and 3D face. 
+A repository for generating stylized talking 3D faces and 2D videos. 
 This is the repository for paper *Imitating Arbitrary Talking Style for Realistic Audio-Driven Talking Face Synthesis, MM 2021*
 
 **we are still clearing up the code, a full version of code will be released soon**
+
 ------
 
-### Overview
+### Quick start
+
+#### Installation
+- `Python 3.6`
+- Install necessary packages through `pip install -r requirements.txt`
+- Download the deepspeech pretrained model from the [Link](https://github.com/mozilla/DeepSpeech/releases/download/v0.9.2/deepspeech-0.9.2-checkpoint.tar.gz), and then unzip the zipped file to `./deepspeech` folder.
+- Same as the instructions of [Deep 3D Face Reconstruction](https://github.com/microsoft/Deep3DFaceReconstruction).
+  - Download the Basel Face Model. Due to the license agreement of Basel Face Model, you have to download the BFM09 model after submitting an application on its [home page](https://faces.dmi.unibas.ch/bfm/main.php?nav=1-2&id=downloads). After getting the access to BFM data, download "01_MorphableModel.mat" and put it into ./deep_3drecon/BFM subfolder.
+  - Download Download the Expression Basis provided by [Guo et al](https://github.com/Juyong/3DFace). You can find a link named "CoarseData" in the first row of Introduction part in their repository. Download and unzip the Coarse_Dataset.zip. Put "Exp_Pca.bin" into ./deep_3drecon/BFM subfolder. The expression basis are constructed using [Facewarehouse](http://kunzhou.net/zjugaps/facewarehouse/) data and transferred to BFM topology.
+  Download the pre-trained [reconstruction network](https://drive.google.com/file/d/176LCdUDxAj7T2awQ5knPMPawq5Q2RUWM/view), unzip it and put "FaceReconModel.pb" into ./deep_3drecon/network subfolder.
+- Download the pretrained [audio2motion model](), put it into `./audio2motion/model`
+- Download the pretrained [rendering model](), put it into `./render/model`
+
+#### Run
+```
+python demo.py --in_img [*.png] --in_audio [*.wav] --output_path [path]
+```
+We provide 10 example talking styles in `style.npy`, you can also calculate your own style codes with the following code. Where the exp is the 3DMM series and pose is the pose matrix reconstructed from [Deep 3D Face Reconstruction](https://github.com/microsoft/Deep3DFaceReconstruction). Usually we calculate style codes with videos of 5-20 seconds.
+
+```python
+def get_style_code(exp, pose):
+  exp_mean_std = pkl.load(open("./data/ted_hd/exp_mean_std.pkl", 'rb'))
+  exp_std_mean = exp_mean_std['s_m']
+  exp_std_std = exp_mean_std['s_s']
+  exp_diff_std_mean = exp_mean_std['d_s_m']
+  exp_diff_std_std = exp_mean_std['d_s_s']
+
+  pose_mean_std = pkl.load(open("./data/ted_hd/pose_mean_std.pkl", 'rb'))
+  pose_diff_std_mean = pose_mean_std['d_s_m']
+  pose_diff_std_std = pose_mean_std['d_s_s']
+
+  diff_exp = exp[:-1, :] - exp[1:, :]
+  exp_std = (np.std(exp, axis = 0) - exp_std_mean) / exp_std_std
+  diff_exp_std = (np.std(diff_exp, axis = 0) - exp_diff_std_mean) / exp_diff_std_std
+
+  diff_pose = pose[:-1, :] - pose[1:, :]
+  diff_pose_std = (np.std(diff_pose, axis = 0) - pose_diff_std_mean) / pose_diff_std_std
+
+  return np.concatenate((exp_std, diff_exp_std, diff_pose_std))
+```
+
+------
+
+### Project Overview
 
 Our project organizes the files as follows:
 
 ```
 ├── README.md
-├── data
 ├── data_process
 ├── deepspeech
-
-The deepspeech folder provides api for extracting deepspeech probabilities.
-
-The data_process folder provides methods for preprocessing video and audio files.
-
-The data folder contains processed data.
-
+├── face_alignment
+├── deep_3drecon
+├── render
+├── audio2motion
 ```
 
-- `Python 3.6`
-- Install necessary packages through `pip install -r requirements.txt`
+#### Data process
+
+#### DeepSpeech
+
+We leverage the [DeepSpeech](https://github.com/mozilla/DeepSpeech) project to extract audio related features. Please download the pretrained deepspeech model from the [Link](https://github.com/mozilla/DeepSpeech/releases/download/v0.9.2/deepspeech-0.9.2-checkpoint.tar.gz). In `deepspeech/evaluate.py`, we implement the funtion `get_prob` to get the latent deepspeech features with input audio path. The latent deepspeech features have 50 frames per second. We should align the deepspeech features to 25 fps videos in subsequent implementations. 
+
+#### Face Alignment
+
+#### Deep 3D Reconstruction
+
+#### Render
+
+#### Audio to Motion
 
 ------
-### DeepSpeech
-
-We leverage the [DeepSpeech](https://github.com/mozilla/DeepSpeech) project to extract audio related features
-
-Please download the pretrained deepspeech model from the [Link](https://github.com/mozilla/DeepSpeech/releases/download/v0.9.2/deepspeech-0.9.2-checkpoint.tar.gz). And then unzip the zip-file to `./deepspeech` folder.
-
-------
-### Dataprocess
+### Data
 
 #### Ted-HD data
-We leverage `lmdb` to store the fragmented data. 
-You can obtain the train/test video with the code bellow
+We leverage `lmdb` to store the fragmented data. The data can be downloaded from [link](). You can obtain the train/test video with the code bellow. We use the Ted-HD data to train the audio2motion model. We also provide the reconstructed 3D param and landmarks in the lmdb.
 
 ```python
 import lmdb
@@ -67,13 +110,7 @@ def test():
         print(txn.stat(db=test_video)) # we can obtain the database size here  
 ```
 
-------
-### Deep3DReconstruction
-We refer to the [Deep3DFaceReconstruction](https://github.com/microsoft/Deep3DFaceReconstruction) to conduct the face reconstruction. 
-We implement several batch-wise api in `deep_3drecon/utils.py`, including UV image generation and RGB texture generation. 
-
-
-Notice that the function `recon_texture` generates texture through aligning input image and 3D model, rather than generating texture from 3DMM space.
+For the training of render, we will not provide the processed dataset due to the license of [LRW](https://www.robots.ox.ac.uk/~vgg/data/lip_reading/lrw1.html).
 
 ------
 ### Citation
