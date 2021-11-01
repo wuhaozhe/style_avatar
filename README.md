@@ -29,7 +29,9 @@ The data folder contains processed data.
 ------
 ### DeepSpeech
 
-Please download the pretrained deepspeech model from the [Link](https://github.com/mozilla/DeepSpeech/releases/download/v0.9.2/deepspeech-0.9.2-checkpoint.tar.gz) to the deepspeech folder and unzip the file.
+We leverage the [DeepSpeech](https://github.com/mozilla/DeepSpeech) project to extract audio related features
+
+Please download the pretrained deepspeech model from the [Link](https://github.com/mozilla/DeepSpeech/releases/download/v0.9.2/deepspeech-0.9.2-checkpoint.tar.gz). And then unzip the zip-file to `./deepspeech` folder.
 
 ------
 ### Dataprocess

@@ -56,7 +56,6 @@ def initialize_globals():
     # Set default checkpoint dir
     if not FLAGS.checkpoint_dir:
         FLAGS.checkpoint_dir = os.path.join(os.path.dirname(__file__), '../', 'deepspeech-0.9.2-checkpoint')
-        # FLAGS.checkpoint_dir = os.path.join(os.path.dirname(__file__), '../', 'deepspeech-0.9.2-checkpoint-zh-CN')
 
 
     if FLAGS.load_train not in ['last', 'best', 'init', 'auto']:
