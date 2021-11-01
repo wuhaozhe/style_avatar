@@ -82,7 +82,6 @@ We leverage the [DeepSpeech](https://github.com/mozilla/DeepSpeech) project to e
 
 #### Ted-HD data
 We leverage `lmdb` to store the fragmented data. The data can be downloaded from [link](). You can obtain the train/test video with the code bellow. We use the Ted-HD data to train the audio2motion model. We also provide the reconstructed 3D param and landmarks in the lmdb.
-
 ```python
 import lmdb
 
