@@ -5,6 +5,4 @@ if __name__ == "__main__":
     conf_cmd = get_conf()
     main_trainer = Trainer(conf_cmd)
 
-    # main_trainer.train()
-    # main_trainer.test()
-    main_trainer.test_all()
+    main_trainer.train()
