@@ -4,9 +4,6 @@ This is the repository for paper *Imitating Arbitrary Talking Style for Realisti
 
 ![framework](framework.jpg)
 
-
-**we are still clearing up the code, a full version of code will be released soon**
-
 ------
 
 ### Quick start
