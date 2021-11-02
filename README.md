@@ -142,3 +142,11 @@ For the training of render, we will not provide the processed dataset due to the
   year={2021}
 }
 ```
+
+------
+### Further works
+
+- Current render is still buggy, there are noisy dots in the synthesized videos, we will fix this problem.
+- We will optimize the rendering results of particular person with video footage of only 2-3 seconds.
+- We will blend the synthesized results with backgrounds.
+- We will add controllable dynamic textures and light control.
