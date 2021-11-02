@@ -2,6 +2,9 @@
 A repository for generating stylized talking 3D faces and 2D videos. 
 This is the repository for paper *Imitating Arbitrary Talking Style for Realistic Audio-Driven Talking Face Synthesis, MM 2021*
 
+![framework](framework.jpg)
+
+
 **we are still clearing up the code, a full version of code will be released soon**
 
 ------
@@ -9,15 +12,18 @@ This is the repository for paper *Imitating Arbitrary Talking Style for Realisti
 ### Quick start
 
 #### Installation
-- `Python 3.6`
+```
+conda create -n python36 python=3.6 
+conda activate python36
+```
 - Install necessary packages through `pip install -r requirements.txt`
-- Download the deepspeech pretrained model from the [Link](https://github.com/mozilla/DeepSpeech/releases/download/v0.9.2/deepspeech-0.9.2-checkpoint.tar.gz), and then unzip the zipped file to `./deepspeech` folder.
+- Download the pretrained deepspeech model from the [Link](https://github.com/mozilla/DeepSpeech/releases/download/v0.9.2/deepspeech-0.9.2-checkpoint.tar.gz), and then unzip the zipped file to `./deepspeech` folder.
 - Same as the instructions of [Deep 3D Face Reconstruction](https://github.com/microsoft/Deep3DFaceReconstruction).
   - Download the Basel Face Model. Due to the license agreement of Basel Face Model, you have to download the BFM09 model after submitting an application on its [home page](https://faces.dmi.unibas.ch/bfm/main.php?nav=1-2&id=downloads). After getting the access to BFM data, download "01_MorphableModel.mat" and put it into ./deep_3drecon/BFM subfolder.
   - Download Download the Expression Basis provided by [Guo et al](https://github.com/Juyong/3DFace). You can find a link named "CoarseData" in the first row of Introduction part in their repository. Download and unzip the Coarse_Dataset.zip. Put "Exp_Pca.bin" into ./deep_3drecon/BFM subfolder. The expression basis are constructed using [Facewarehouse](http://kunzhou.net/zjugaps/facewarehouse/) data and transferred to BFM topology.
   Download the pre-trained [reconstruction network](https://drive.google.com/file/d/176LCdUDxAj7T2awQ5knPMPawq5Q2RUWM/view), unzip it and put "FaceReconModel.pb" into ./deep_3drecon/network subfolder.
-- Download the pretrained [audio2motion model](), put it into `./audio2motion/model`
-- Download the pretrained [rendering model](), put it into `./render/model`
+- Download the pretrained [audio2motion model](https://cloud.tsinghua.edu.cn/f/acb6d482a26e4eb8b116/?dl=1), put it into `./audio2motion/model`
+- Download the pretrained [texture encoder](https://cloud.tsinghua.edu.cn/f/c60a3466016948c48951/?dl=1) and [render](https://cloud.tsinghua.edu.cn/f/106023055772444f8f15/?dl=1), put it into `./render/model`
 
 #### Run
 ```
@@ -64,6 +70,7 @@ Our project organizes the files as follows:
 ```
 
 #### Data process
+The data process folder contains processing code of several datasets.
 
 #### DeepSpeech
 
@@ -71,22 +78,30 @@ We leverage the [DeepSpeech](https://github.com/mozilla/DeepSpeech) project to e
 
 #### Face Alignment
 
-#### Deep 3D Reconstruction
+We modify [Face Alignment](https://github.com/1adrianb/face-alignment) for data preprocess. Different from the original project, we enforce the face alignment to detect only the largest face in each frame for speed-up.
+
+#### Deep 3D Face Reconstruction
+
+We modify [Deep 3D Face Reconstruction](https://github.com/microsoft/Deep3DFaceReconstruction) for data preprocess. We add  batch-api, uv-texture unwarpping api and uv coodinate image generation api in `deep_3drecon/utils.py`.
 
 #### Render
 
+We implement our texture encoder and rendering model in the render folder. We also implement some other renders like [neural voice puppertry](https://arxiv.org/abs/1912.05566).
+
 #### Audio to Motion
+
+We implement our stylized audio to facial motion model in audio2motion folder.
 
 ------
 ### Data
 
 #### Ted-HD data
-We leverage `lmdb` to store the fragmented data. The data can be downloaded from [link](). You can obtain the train/test video with the code bellow. We use the Ted-HD data to train the audio2motion model. We also provide the reconstructed 3D param and landmarks in the lmdb.
+We leverage `lmdb` to store the fragmented data. The data can be downloaded from [link](https://cloud.tsinghua.edu.cn/d/b046cc3ee1774beb9511/), and then run `cat xa* > data.mdb`. You can obtain the train/test video with the code bellow. We use the Ted-HD data to train the audio2motion model. We also provide the reconstructed 3D param and landmarks in the lmdb.
 ```python
 import lmdb
 
 def test():
-    lmdb_path = "../data/ted_hd/lmdb"
+    lmdb_path = "./lmdb"
     env = lmdb.open(lmdb_path, map_size=1099511627776, max_dbs = 64)
 
     train_video = env.open_db("train_video".encode())
