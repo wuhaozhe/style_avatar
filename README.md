@@ -22,10 +22,12 @@ conda activate python36
   - Download the Basel Face Model. Due to the license agreement of Basel Face Model, you have to download the BFM09 model after submitting an application on its [home page](https://faces.dmi.unibas.ch/bfm/main.php?nav=1-2&id=downloads). After getting the access to BFM data, download "01_MorphableModel.mat" and put it into ./deep_3drecon/BFM subfolder.
   - Download Download the Expression Basis provided by [Guo et al](https://github.com/Juyong/3DFace). You can find a link named "CoarseData" in the first row of Introduction part in their repository. Download and unzip the Coarse_Dataset.zip. Put "Exp_Pca.bin" into ./deep_3drecon/BFM subfolder. The expression basis are constructed using [Facewarehouse](http://kunzhou.net/zjugaps/facewarehouse/) data and transferred to BFM topology.
   Download the pre-trained [reconstruction network](https://drive.google.com/file/d/176LCdUDxAj7T2awQ5knPMPawq5Q2RUWM/view), unzip it and put "FaceReconModel.pb" into ./deep_3drecon/network subfolder.
+  - Run `git lfs checkout ./deep_3drecon/BFM/BFM_model_front.mat`
 - Download the pretrained [audio2motion model](https://cloud.tsinghua.edu.cn/f/acb6d482a26e4eb8b116/?dl=1), put it into `./audio2motion/model`
 - Download the pretrained [texture encoder](https://cloud.tsinghua.edu.cn/f/c60a3466016948c48951/?dl=1) and [render](https://cloud.tsinghua.edu.cn/f/106023055772444f8f15/?dl=1), put it into `./render/model`
 
 #### Run
+To run our demo, you need at least one GPU with 11G GPU memory.
 ```
 python demo.py --in_img [*.png] --in_audio [*.wav] --output_path [path]
 ```
@@ -52,6 +54,8 @@ def get_style_code(exp, pose):
 
   return np.concatenate((exp_std, diff_exp_std, diff_pose_std))
 ```
+
+Notice that the pose of each talking face is static in current demo, you can control the pose of face by modifying the coeff_array in demo.py in line 93. The coeff_array has shape of $N * 257$ , where $N$ is framesize, vector of $257$ dimensions has same definition as [deep 3d face reconstruction](https://github.com/microsoft/Deep3DFaceReconstruction), where $254-257$ dim controls the translation, and $224-227$ dim controls euler angles for pose.
 
 ------
 

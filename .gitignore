@@ -2,6 +2,7 @@
 **/*.pyc
 deepspeech/deepspeech-0.9.2-checkpoint/
 **/*.wav
+!example/example.wav
 **/*.zip
 **/*.m4a
 **/*.mp4
