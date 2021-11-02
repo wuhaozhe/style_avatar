@@ -18,3 +18,5 @@ torchvision>=0.4.0
 tensorflow-addons>=0.12.1
 easydict>=1.9
 tensorboardX>=1.8
+opencv-python>=4.5.1
+scikit-image>=0.17.2
