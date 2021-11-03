@@ -1,6 +1,7 @@
 # style_avatar
 A repository for generating stylized talking 3D faces and 2D videos. 
 This is the repository for paper *Imitating Arbitrary Talking Style for Realistic Audio-Driven Talking Face Synthesis, MM 2021*
+The demo video can be viewed in this link: https://hcsi.cs.tsinghua.edu.cn/demo/MM21-HAOZHEWU.mp4.
 
 ![framework](framework.jpg)
 
