@@ -130,9 +130,9 @@ def get_test_data():
 if __name__ == "__main__":
     # 从ted test里面拿数据做测试
     # get_test_data()
-    # main_trainer = RenderTrainerAdv(args)
-    main_trainer = BlendTrainerAdv(args)
+    main_trainer = RenderTrainerAdv(args)
+    # main_trainer = BlendTrainerAdv(args)
     # test_data = pkl.load(open('test.pkl', 'rb'))
     # main_trainer = TuneTrainer(args, test_data)
-    main_trainer.train()
-    # main_trainer.test()
+    # main_trainer.train()
+    main_trainer.test()

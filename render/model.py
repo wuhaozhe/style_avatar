@@ -146,7 +146,7 @@ class TexSampler(nn.Module):
     def forward(self, uv, tex):
         uv = uv * 2 - 1
         uv_perm = uv.permute(0, 2, 3, 1)
-        sample_image = F.grid_sample(tex, uv_perm, mode='bicubic')
+        sample_image = F.grid_sample(tex, uv_perm, mode='bilinear')
         return sample_image
 
 def get_norm_layer(norm_type='instance'):

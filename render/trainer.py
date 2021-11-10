@@ -181,6 +181,8 @@ class RenderTrainerAdv(object):
                 bg_img_batch, uv_img_batch, tex_img_batch = bg_img_batch.unsqueeze(0), uv_img_batch.unsqueeze(0), tex_img_batch.unsqueeze(0)
                 tex_img_batch = tex_img_batch.reshape(tex_img_batch.shape[0], -1, tex_img_batch.shape[3], tex_img_batch.shape[4]).to(self.device)
                 tex = self.tex_encoder(tex_img_batch)
+                # tex = tex_img_batch
+                # torchvision.utils.save_image(torch.flip(tex[0], dims = [0]), "test_tex.png", normalize = True, range = (-1, 1))
                 # tex = tex_img_batch[:, 0]
                 # torchvision.utils.save_image(tex[0], "test.png", normalize = True, range = (-1, 1))
                 pred_img_batch = torch.zeros((uv_img_batch.shape[0], uv_img_batch.shape[1], 3, uv_img_batch.shape[3], uv_img_batch.shape[4])).float()
@@ -192,13 +194,15 @@ class RenderTrainerAdv(object):
                         end_idx = start_idx + batch_size
                     bg_tmp_batch = bg_img_batch[:, start_idx: end_idx].to(self.device)
                     uv_tmp_batch = uv_img_batch[:, start_idx: end_idx].to(self.device)
+                    # torchvision.utils.save_image(torch.flip(uv_tmp_batch[0, 0], dims = [0]), "test_uv.png", normalize = True, range = (-1, 1))
                     bg_tmp_batch = bg_tmp_batch.reshape(-1, bg_tmp_batch.shape[2], bg_tmp_batch.shape[3], bg_tmp_batch.shape[4])
                     uv_tmp_batch = uv_tmp_batch.reshape(-1, uv_tmp_batch.shape[2], uv_tmp_batch.shape[3], uv_tmp_batch.shape[4])
                     tex_tmp = tex.unsqueeze(1).repeat(1, uv_tmp_batch.shape[0], 1, 1, 1)
                     tex_tmp = tex_tmp.reshape(-1, tex_tmp.shape[2], tex_tmp.shape[3], tex_tmp.shape[4])
                     sample_image = self.tex_sampler(uv_tmp_batch, tex_tmp)
+                    # pred_image = sample_image
                     pred_image = self.face_unet(sample_image) * (1 - bg_tmp_batch)
-                    # pred_image = sample_image * (1 - bg_tmp_batch)
+                    pred_image = sample_image * (1 - bg_tmp_batch)
                     pred_img_batch[:, start_idx:end_idx] = pred_image.cpu()
                     start_idx += batch_size
                 pred_img_batch = pred_img_batch[0].cpu().detach()

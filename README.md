@@ -20,7 +20,7 @@ conda activate python36
   - Download the Basel Face Model. Due to the license agreement of Basel Face Model, you have to download the BFM09 model after submitting an application on its [home page](https://faces.dmi.unibas.ch/bfm/main.php?nav=1-2&id=downloads). After getting the access to BFM data, download "01_MorphableModel.mat" and put it into ./deep_3drecon/BFM subfolder.
   - Download Download the Expression Basis provided by [Guo et al](https://github.com/Juyong/3DFace). You can find a link named "CoarseData" in the first row of Introduction part in their repository. Download and unzip the Coarse_Dataset.zip. Put "Exp_Pca.bin" into ./deep_3drecon/BFM subfolder. The expression basis are constructed using [Facewarehouse](http://kunzhou.net/zjugaps/facewarehouse/) data and transferred to BFM topology.
   Download the pre-trained [reconstruction network](https://drive.google.com/file/d/176LCdUDxAj7T2awQ5knPMPawq5Q2RUWM/view), unzip it and put "FaceReconModel.pb" into ./deep_3drecon/network subfolder.
-  - Run `git lfs checkout ./deep_3drecon/BFM/BFM_model_front.mat`
+  - Download [BFM_model_front.mat](https://cloud.tsinghua.edu.cn/f/b1a0e03bdb69445f8148/?dl=1) and put it into ./deep_3drecon/BFM subfolder.
 - Download the pretrained [audio2motion model](https://cloud.tsinghua.edu.cn/f/acb6d482a26e4eb8b116/?dl=1), put it into `./audio2motion/model`
 - Download the pretrained [texture encoder](https://cloud.tsinghua.edu.cn/f/c60a3466016948c48951/?dl=1) and [render](https://cloud.tsinghua.edu.cn/f/106023055772444f8f15/?dl=1), put it into `./render/model`
 
